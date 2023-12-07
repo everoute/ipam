@@ -5,7 +5,7 @@ on:
 
 jobs:
   golint:
-    runs-on: self-hosted
+    runs-on: [self-hosted, pod]
     steps:
       - uses: actions/checkout@v3
 
@@ -27,7 +27,7 @@ jobs:
           skip-build-cache: true # skip cache because of flaky behaviors
 
   govulncheck:
-    runs-on: self-hosted
+    runs-on: [self-hosted, pod]
     steps:
       - uses: actions/checkout@v3
 
@@ -40,7 +40,7 @@ jobs:
         if: steps.check_files.outputs.files_exists == 'true'
 
   generate-check:
-    runs-on: self-hosted
+    runs-on: [self-hosted, pod]
     steps:
       - uses: actions/checkout@v3
 
@@ -55,7 +55,7 @@ jobs:
         run: echo "::error::Please run \"make generate\" or \"make docker-generate\" before commit."
 
   commitlint:
-    runs-on: self-hosted
+    runs-on: [self-hosted, pod]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -65,7 +65,7 @@ jobs:
           configFile: .commitlintrc.json
 
   helmlint:
-    runs-on: self-hosted
+    runs-on: [self-hosted, pod]
     steps:
       - uses: actions/checkout@v3
       - uses: andstor/file-existence-action@v2
