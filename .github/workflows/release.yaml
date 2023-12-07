@@ -1,0 +1,33 @@
+name: release
+on:
+  push:
+    tags: ['*']
+
+jobs:
+  publish:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: setup release version environment
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: publish helm chart and images
+        run: sudo make publish
+
+      - name: send chart information to slack
+        uses: slackapi/slack-github-action@v1.17.0
+        with:
+          payload: '{"text":"Project ${{ github.repository }} ${{ env.RELEASE_VERSION }} Published."}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: send slack notify on publish failed
+        if: ${{ failure() }}
+        uses: slackapi/slack-github-action@v1.17.0
+        with:
+          payload: '{"text":"Build failed for ${{ env.RELEASE_VERSION }}\nSee more: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

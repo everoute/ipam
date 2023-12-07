@@ -1,0 +1,80 @@
+name: lint
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  golint:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: andstor/file-existence-action@v2
+        id: check_files
+        with:
+          files: "go.mod"
+
+      - name: setup go with docker
+        run: |
+          docker run --rm -v /usr/local:/sys_usr_local golang:1.19 cp -r /usr/local/go /sys_usr_local/
+          echo "PATH=${PATH}:/usr/local/go/bin" >> $GITHUB_ENV
+
+      - uses: golangci/golangci-lint-action@v3
+        if: steps.check_files.outputs.files_exists == 'true'
+        with:
+          version: v1.52
+          skip-pkg-cache: true
+          skip-build-cache: true # skip cache because of flaky behaviors
+
+  govulncheck:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: andstor/file-existence-action@v2
+        id: check_files
+        with:
+          files: "go.mod"
+
+      - uses: golang/govulncheck-action@v1
+        if: steps.check_files.outputs.files_exists == 'true'
+
+  generate-check:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: make docker-generate
+        run: sudo make docker-generate
+
+      - name: check if code changes
+        run: sudo sh -c "git add -A && git diff HEAD --exit-code"
+
+      - name: show message if failed
+        if: ${{ failure() }}
+        run: echo "::error::Please run \"make generate\" or \"make docker-generate\" before commit."
+
+  commitlint:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v4
+        with:
+          configFile: .commitlintrc.json
+
+  helmlint:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      - uses: andstor/file-existence-action@v2
+        id: check_files
+        with:
+          files: "./build/chart/Chart.yaml"
+      - uses: azure/setup-helm@v3
+        if: steps.check_files.outputs.files_exists == 'true'
+        with:
+          version: "v3.9.4"
+      - if: steps.check_files.outputs.files_exists == 'true'
+        run: helm lint ./build/chart

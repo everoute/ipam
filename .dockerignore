@@ -1,0 +1,8 @@
+.github/
+bin/
+build/
+.idea/
+.commitlintrc.json
+.gitignore
+.golangci.yml
+codecov.yaml
