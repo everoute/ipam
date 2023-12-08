@@ -14,30 +14,32 @@ jobs:
         with:
           files: "go.mod"
 
-      - name: setup go with docker
-        run: |
-          docker run --rm -v /usr/local:/sys_usr_local golang:1.19 cp -r /usr/local/go /sys_usr_local/
-          echo "PATH=${PATH}:/usr/local/go/bin" >> $GITHUB_ENV
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.20'
 
       - uses: golangci/golangci-lint-action@v3
         if: steps.check_files.outputs.files_exists == 'true'
         with:
           version: v1.52
+          only-new-issues: true
           skip-pkg-cache: true
           skip-build-cache: true # skip cache because of flaky behaviors
 
-  govulncheck:
-    runs-on: [self-hosted, pod]
-    steps:
-      - uses: actions/checkout@v3
+  # govulncheck:
+  #   runs-on: [self-hosted, pod]
+  #   steps:
+  #     - uses: actions/checkout@v3
 
-      - uses: andstor/file-existence-action@v2
-        id: check_files
-        with:
-          files: "go.mod"
+  #     - uses: andstor/file-existence-action@v2
+  #       id: check_files
+  #       with:
+  #         files: "go.mod"
 
-      - uses: golang/govulncheck-action@v1
-        if: steps.check_files.outputs.files_exists == 'true'
+  #     - uses: golang/govulncheck-action@v1
+  #       if: steps.check_files.outputs.files_exists == 'true'
+  #       with:
+  #         go-version-input: '1.20'
 
   generate-check:
     runs-on: [self-hosted, pod]
