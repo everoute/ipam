@@ -56,6 +56,19 @@ spec:
           status:
             description: Status is the current state of the IPPool
             properties:
+              allocatedips:
+                additionalProperties:
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      description: Type=pod, ID=podns/name
+                      type: string
+                  required:
+                  - id
+                  type: object
+                description: AllocatedIPs is ip and allocated infos
+                type: object
               offset:
                 description: Offset stores the current read pointer -1 means this
                   pool is full
@@ -64,7 +77,7 @@ spec:
               usedips:
                 additionalProperties:
                   type: string
-                description: UsedIps contains all allocated IP addresses
+                description: UsedIps can't delete to compatible with upgrade scenarios
                 type: object
             type: object
         required:
