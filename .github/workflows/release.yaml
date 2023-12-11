@@ -10,12 +10,26 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: setup release version environment
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+      
+      - run: |
+          if [[ ${{ github.ref }} =~ ^refs\/tags\/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then 
+            echo "NEED_RELEASE=true" >> $GITHUB_ENV
+          fi
 
-      - name: publish helm chart and images
-        run: sudo make publish
+      - name: Create Release
+        if: env.NEED_RELEASE == 'true'
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            deploy/crds/ipam.everoute.io_ippools.yaml
+            deploy/templates/webhook.yaml
+          name: ${{ env.RELEASE_VERSION }}
+          generate_release_notes: true
 
       - name: send chart information to slack
+        if: ${{ success() && env.NEED_RELEASE == 'true' }}
         uses: slackapi/slack-github-action@v1.17.0
         with:
           payload: '{"text":"Project ${{ github.repository }} ${{ env.RELEASE_VERSION }} Published."}'
