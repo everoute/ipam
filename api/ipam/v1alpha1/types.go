@@ -41,12 +41,27 @@ type IPPoolSpec struct {
 
 // IPPoolStatus describe the current state of the IPPool
 type IPPoolStatus struct {
-	// UsedIps contains all allocated IP addresses
+	// UsedIps can't delete to compatible with upgrade scenarios
 	UsedIps map[string]string `json:"usedips,omitempty"`
+	// AllocatedIPs is ip and allocated infos
+	AllocatedIPs map[string]AllocateInfo `json:"allocatedips,omitempty"`
 	// Offset stores the current read pointer
 	// -1 means this pool is full
 	Offset int64 `json:"offset,omitempty"`
 }
+
+type AllocateInfo struct {
+	ID string `json:"id"`
+	// Type=pod, ID=podns/name
+	Type AllocateType `json:"type,omitempty"`
+}
+
+type AllocateType string
+
+const (
+	AllocatedTypeCNIUsed AllocateType = "cniused"
+	AllocatedTypePod     AllocateType = "pod"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
