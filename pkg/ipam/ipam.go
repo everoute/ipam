@@ -193,7 +193,9 @@ func (i *Ipam) FindNext(ipPool *v1alpha1.IPPool) (net.IP, int64) {
 		if !newIP.Equal(utils.FirstIP(subnet)) &&
 			!newIP.Equal(utils.LastIP(subnet)) &&
 			newIP.String() != ipPool.Spec.Gateway {
-			if _, exist := ipPool.Status.UsedIps[newIP.String()]; !exist {
+			_, usedIPExist := ipPool.Status.UsedIps[newIP.String()]
+			_, allocateExist := ipPool.Status.AllocatedIPs[newIP.String()]
+			if !usedIPExist && !allocateExist {
 				// get valid IP and set offset to next pos
 				return newIP, (offset + 1) % int64(length)
 			}
@@ -233,6 +235,9 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 		switch op {
 		case IPAdd:
 			if _, exist := pool.Status.UsedIps[conf.IP]; exist {
+				return fmt.Errorf("ip address exist")
+			}
+			if _, exist := pool.Status.AllocatedIPs[conf.IP]; exist {
 				return fmt.Errorf("ip address exist")
 			}
 			if offset != IPPoolOffsetFull {
