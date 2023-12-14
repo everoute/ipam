@@ -5,6 +5,9 @@ CONTROLLER_GEN=$(shell which controller-gen)
 image-generate:
 	docker build -f build/image/generate/Dockerfile -t localhost/generate ./build/image/generate/
 
+image-test:
+	docker build -f build/image/unit-test/Dockerfile -t localhost/unit-test ./build/image/unit-test/
+
 generate: prefix manifests
 	
 
@@ -15,9 +18,9 @@ docker-generate: image-generate
 test:
 	go test ./... --race --coverprofile coverage.out
 
-docker-test:
+docker-test: image-test
 	$(eval WORKDIR := /go/src/github.com/everoute/ipam)
-	docker run --rm -iu 0:0 -w $(WORKDIR) -v $(CURDIR):$(WORKDIR) golang:1.20 make test
+	docker run --rm -iu 0:0 -w $(WORKDIR) -v $(CURDIR):$(WORKDIR) localhost/unit-test bash
 
 prefix:
 	find . -name "*.go" -exec gci write --Section Standard --Section Default --Section "Prefix(github.com/everoute/ipam)" {} +
