@@ -16,7 +16,7 @@ docker-generate: image-generate
 	docker run --rm -iu 0:0 -w $(WORKDIR) -v $(CURDIR):$(WORKDIR) localhost/generate make generate
 
 test:
-	go test ./... --race --coverprofile coverage.out
+	go test ./... -p 1 --race --coverprofile coverage.out
 
 docker-test: image-test
 	$(eval WORKDIR := /go/src/github.com/everoute/ipam)
