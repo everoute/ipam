@@ -11,15 +11,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/everoute/ipam/api/ipam/v1alpha1"
+	"github.com/everoute/ipam/pkg/constants"
 	"github.com/everoute/ipam/pkg/utils"
 )
 
 const (
 	UpdateRetryCount = 5
 	FindRetryCount   = 5
-
-	IPPoolOffsetFull   = -1
-	IPPoolOffsetIgnore = -2
 )
 
 type OP int
@@ -64,7 +62,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 			}
 			// get the first no-full ip pool
 			if ipPool.Name == "" {
-				if item.Status.Offset != IPPoolOffsetFull && item.Name != "" {
+				if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
 					ipPool = &ipPools.Items[index]
 				}
 			}
@@ -109,7 +107,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 		}
 
 		// update ip address into pool
-		if err := i.UpdatePool(conf, IPPoolOffsetIgnore, IPAdd); err != nil {
+		if err := i.UpdatePool(conf, constants.IPPoolOffsetIgnore, IPAdd); err != nil {
 			return nil, err
 		}
 
@@ -124,7 +122,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 			klog.Error(err)
 			continue
 		}
-		if newOffset == IPPoolOffsetFull {
+		if newOffset == constants.IPPoolOffsetFull {
 			break
 		}
 		return i.ParseResult(ipPool, newIP.String()), nil
@@ -149,7 +147,7 @@ func (i *Ipam) ExecDel(conf *NetConf) error {
 	}
 	for _, item := range ipPools.Items {
 		conf.Pool = item.Name
-		_ = i.UpdatePool(conf, 0, IPDel)
+		_ = i.UpdatePool(conf, constants.IPPoolOffsetReset, IPDel)
 	}
 
 	return nil
@@ -187,7 +185,7 @@ func (i *Ipam) FindNext(ipPool *v1alpha1.IPPool) (net.IP, int64) {
 		}
 	}
 
-	return nil, IPPoolOffsetFull
+	return nil, constants.IPPoolOffsetFull
 }
 
 func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
@@ -220,10 +218,10 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 			if _, exist := pool.Status.AllocatedIPs[conf.IP]; exist {
 				return fmt.Errorf("ip address exist")
 			}
-			if offset != IPPoolOffsetFull {
+			if offset != constants.IPPoolOffsetFull {
 				pool.Status.AllocatedIPs[conf.IP] = conf.genAllocateInfo()
 			}
-			if offset != IPPoolOffsetIgnore {
+			if offset != constants.IPPoolOffsetIgnore {
 				pool.Status.Offset = offset
 			}
 			statusUpdate = true
@@ -231,7 +229,7 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 			for k, v := range pool.Status.UsedIps {
 				if v == conf.AllocateIdentify {
 					delete(pool.Status.UsedIps, k)
-					if pool.Status.Offset == IPPoolOffsetFull {
+					if pool.Status.Offset == constants.IPPoolOffsetFull {
 						pool.Status.Offset = offset
 					}
 					statusUpdate = true
@@ -241,7 +239,7 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 			for k, v := range pool.Status.AllocatedIPs {
 				if v.Type == conf.Type && v.ID == conf.getAllocateID() {
 					delete(pool.Status.AllocatedIPs, k)
-					if pool.Status.Offset == IPPoolOffsetFull {
+					if pool.Status.Offset == constants.IPPoolOffsetFull {
 						pool.Status.Offset = offset
 					}
 					statusUpdate = true
