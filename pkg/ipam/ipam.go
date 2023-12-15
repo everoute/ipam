@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	IpamAnnotationPool     = "ipam.everoute.io/pool"
-	IpamAnnotationStaticIP = "ipam.everoute.io/static-ip"
-
 	UpdateRetryCount = 5
 	FindRetryCount   = 5
+
+	IPPoolOffsetFull   = -1
+	IPPoolOffsetIgnore = -2
 )
 
 type OP int
@@ -29,42 +29,12 @@ const (
 	IPDel
 )
 
-const (
-	IPPoolOffsetFull   = -1
-	IPPoolOffsetIgnore = -2
-)
-
 type Ipam struct {
 	k8sClient client.Client
 	namespace string
 }
 
-type NetConf struct {
-	Pool string
-	IP   string
-	// default is containerID, type=cniused, defined by the cni
-	AllocateIdentify string
-	K8sPodName       string
-	K8sPodNs         string
-	// default is allocate IP to Pod
-	Type v1alpha1.AllocateType
-}
-
-func (c *NetConf) getAllocateID() string {
-	allocatedID := c.AllocateIdentify
-	if c.Type == v1alpha1.AllocatedTypePod {
-		allocatedID = utils.GetAllocateIDFromPod(c.K8sPodNs, c.K8sPodName)
-	}
-	return allocatedID
-}
-
-func (c *NetConf) genAllocateInfo() v1alpha1.AllocateInfo {
-	return v1alpha1.AllocateInfo{
-		Type: c.Type,
-		ID:   c.getAllocateID(),
-	}
-}
-
+// InitIpam returns a Ipam, param k8sClient that must add ippool scheme
 func InitIpam(k8sClient client.Client, namespace string) *Ipam {
 	ipam := &Ipam{
 		k8sClient: k8sClient,
@@ -75,6 +45,11 @@ func InitIpam(k8sClient client.Client, namespace string) *Ipam {
 }
 
 func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
+	if err := conf.Valid(); err != nil {
+		klog.Errorf("Invalid param %v, err: %v", *conf, err)
+		return nil, err
+	}
+
 	ipPool := &v1alpha1.IPPool{}
 
 	// get target ip pool
@@ -163,6 +138,11 @@ func (i *Ipam) ExecCheck(*NetConf) error {
 }
 
 func (i *Ipam) ExecDel(conf *NetConf) error {
+	if err := conf.Valid(); err != nil {
+		klog.Errorf("Invalid param %v, err: %v", *conf, err)
+		return nil
+	}
+
 	ipPools := v1alpha1.IPPoolList{}
 	if err := i.k8sClient.List(context.Background(), &ipPools); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)

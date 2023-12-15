@@ -69,7 +69,7 @@ var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).Should(Succeed())
 })
 
-func TestController(t *testing.T) {
+func TestIPAM(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "ipam Suite")
 }

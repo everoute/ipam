@@ -247,7 +247,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-					}, interval, timeout).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
 				})
 				When("ippool has allocated some IP", func() {
 					BeforeEach(func() {
@@ -279,7 +279,7 @@ var _ = Describe("ipam", func() {
 							g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
 							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod}))
 							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "identity", Type: v1alpha1.AllocatedTypeCNIUsed}))
-						}, interval, timeout).Should(Succeed())
+						}, timeout, interval).Should(Succeed())
 					})
 				})
 				When("ippool has allocated hole", func() {
@@ -314,7 +314,7 @@ var _ = Describe("ipam", func() {
 							g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
 							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.2", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
 							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod}))
-						}, interval, timeout).Should(Succeed())
+						}, timeout, interval).Should(Succeed())
 					})
 				})
 			})
@@ -370,7 +370,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.UsedIps).Should(HaveKeyWithValue("10.10.65.0", "containerID"))
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod}))
-					}, interval, timeout).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
 				})
 			})
 		})
@@ -397,7 +397,7 @@ var _ = Describe("ipam", func() {
 					g.Expect(ippool.Status.UsedIps).Should(BeNil())
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-				}, interval, timeout).Should(Succeed())
+				}, timeout, interval).Should(Succeed())
 			})
 			When("next IP is gateway", func() {
 				BeforeEach(func() {
@@ -428,7 +428,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.UsedIps).Should(HaveKeyWithValue("12.10.64.1", "containerID"))
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-					}, interval, timeout).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
 				})
 			})
 			When("next IP is subnet last IP", func() {
@@ -488,7 +488,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-					}, interval, timeout).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
 				})
 			})
 			When("specify ippool", func() {
@@ -511,7 +511,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-					}, interval, timeout).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
 				})
 				When("a pod request IP in a second time", func() {
 					BeforeEach(func() {
@@ -543,7 +543,7 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-							}, interval, timeout).Should(Succeed())
+							}, timeout, interval).Should(Succeed())
 						})
 					})
 					When("current IP in specified pool", func() {
@@ -566,7 +566,7 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-							}, interval, timeout).Should(Succeed())
+							}, timeout, interval).Should(Succeed())
 						})
 					})
 				})
@@ -605,7 +605,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-					}, interval, timeout).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
 				})
 				When("a pod request IP in a second time", func() {
 					BeforeEach(func() {
@@ -639,7 +639,7 @@ var _ = Describe("ipam", func() {
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
 								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
 								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.6", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-							}, interval, timeout).Should(Succeed())
+							}, timeout, interval).Should(Succeed())
 						})
 					})
 					When("current IP is same as specified IP", func() {
@@ -663,7 +663,7 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-							}, interval, timeout).Should(Succeed())
+							}, timeout, interval).Should(Succeed())
 						})
 					})
 				})
@@ -777,6 +777,8 @@ var _ = Describe("ipam", func() {
 			c := NetConf{
 				Type:             v1alpha1.AllocatedTypePod,
 				AllocateIdentify: "containerID",
+				K8sPodName:       "pod-unexist",
+				K8sPodNs:         "ns-unexist",
 			}
 			_ = ipam.ExecDel(&c)
 			Eventually(func(g Gomega) {
@@ -786,7 +788,7 @@ var _ = Describe("ipam", func() {
 				g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
 				g.Expect(len(ippool.Status.UsedIps)).Should(Equal(0))
 				g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
-			}, interval, timeout).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 		})
 		When("release by allocate info", func() {
 			It("for type cniused", func() {
@@ -803,7 +805,7 @@ var _ = Describe("ipam", func() {
 					g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-				}, interval, timeout).Should(Succeed())
+				}, timeout, interval).Should(Succeed())
 			})
 			It("for type pod", func() {
 				c := NetConf{
@@ -821,7 +823,7 @@ var _ = Describe("ipam", func() {
 					g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "cniusedID", Type: v1alpha1.AllocatedTypeCNIUsed}))
-				}, interval, timeout).Should(Succeed())
+				}, timeout, interval).Should(Succeed())
 			})
 		})
 		It("release unexist", func() {
@@ -875,7 +877,7 @@ var _ = Describe("ipam", func() {
 					g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
 					g.Expect(ippool.Status.UsedIps).Should(BeNil())
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(0))
-				}, interval, timeout).Should(Succeed())
+				}, timeout, interval).Should(Succeed())
 			})
 		})
 	})
