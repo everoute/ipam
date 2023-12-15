@@ -29,10 +29,9 @@ type IPPoolSpec struct {
 	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\/([1-9]|[1-2]\\d|3[0-2])$"
 	CIDR string `json:"cidr"`
 	// Subnet is the total L2 network,
-	// If this field is empty, use CIDR instead.
 	//nolint: lll
 	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\/([1-9]|[1-2]\\d|3[0-2])$"
-	Subnet string `json:"subnet,omitempty"`
+	Subnet string `json:"subnet"`
 	// Gateway must a valid IP in Subnet
 	//nolint: lll
 	// +kubebuilder:validation:Pattern="^(((([1]?\\d)?\\d|2[0-4]\\d|25[0-5])\\.){3}(([1]?\\d)?\\d|2[0-4]\\d|25[0-5]))|([\\da-fA-F]{1,4}(\\:[\\da-fA-F]{1,4}){7})|(([\\da-fA-F]{1,4}:){0,5}::([\\da-fA-F]{1,4}:){0,5}[\\da-fA-F]{1,4})$"
