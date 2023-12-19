@@ -60,9 +60,12 @@ spec:
                 additionalProperties:
                   properties:
                     id:
+                      description: Type=pod, ID=podns/name
+                      type: string
+                    owner:
+                      description: Type=statefulset, owner=statefulsetns/name
                       type: string
                     type:
-                      description: Type=pod, ID=podns/name
                       type: string
                   required:
                   - id

@@ -10,6 +10,7 @@ import (
 	cniv1 "github.com/containernetworking/cni/pkg/types/100"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +49,7 @@ var _ = BeforeSuite(func() {
 	scheme := scheme.Scheme
 	Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 	Expect(v1alpha1.AddToScheme(scheme)).Should(Succeed())
+	Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())

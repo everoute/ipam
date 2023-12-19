@@ -22,24 +22,24 @@ func TestGenAllocateInfo(t *testing.T) {
 		{
 			name: "type pod",
 			conf: NetConf{
-				Type:             v1alpha1.AllocatedTypePod,
+				Type:             v1alpha1.AllocateTypePod,
 				AllocateIdentify: "containerid",
 				K8sPodName:       "podname",
 				K8sPodNs:         "podns",
 			},
 			exp: v1alpha1.AllocateInfo{
-				Type: v1alpha1.AllocatedTypePod,
+				Type: v1alpha1.AllocateTypePod,
 				ID:   "podns/podname",
 			},
 		},
 		{
 			name: "type cniused",
 			conf: NetConf{
-				Type:             v1alpha1.AllocatedTypeCNIUsed,
+				Type:             v1alpha1.AllocateTypeCNIUsed,
 				AllocateIdentify: "identify",
 			},
 			exp: v1alpha1.AllocateInfo{
-				Type: v1alpha1.AllocatedTypeCNIUsed,
+				Type: v1alpha1.AllocateTypeCNIUsed,
 				ID:   "identify",
 			},
 		},
@@ -63,7 +63,7 @@ func TestReallocateIP(t *testing.T) {
 		{
 			name: "no reallocate for pod",
 			conf: NetConf{
-				Type:             v1alpha1.AllocatedTypePod,
+				Type:             v1alpha1.AllocateTypePod,
 				K8sPodName:       "podName",
 				K8sPodNs:         "podNs",
 				AllocateIdentify: "123556",
@@ -79,7 +79,7 @@ func TestReallocateIP(t *testing.T) {
 			name: "no reallocate for pool",
 			conf: NetConf{
 				Pool:       "pool1",
-				Type:       v1alpha1.AllocatedTypePod,
+				Type:       v1alpha1.AllocateTypePod,
 				K8sPodName: "podName",
 				K8sPodNs:   "podNs",
 			},
@@ -98,7 +98,7 @@ func TestReallocateIP(t *testing.T) {
 			conf: NetConf{
 				Pool:       "pool1",
 				IP:         "10.1.1.2",
-				Type:       v1alpha1.AllocatedTypePod,
+				Type:       v1alpha1.AllocateTypePod,
 				K8sPodName: "podName",
 				K8sPodNs:   "podNs",
 			},
@@ -115,7 +115,7 @@ func TestReallocateIP(t *testing.T) {
 		{
 			name: "no reallocate for cniused",
 			conf: NetConf{
-				Type:             v1alpha1.AllocatedTypeCNIUsed,
+				Type:             v1alpha1.AllocateTypeCNIUsed,
 				AllocateIdentify: "123456",
 				K8sPodName:       "podName",
 				K8sPodNs:         "podNs",
@@ -130,7 +130,7 @@ func TestReallocateIP(t *testing.T) {
 		{
 			name: "reallocate IP for pod",
 			conf: NetConf{
-				Type:       v1alpha1.AllocatedTypePod,
+				Type:       v1alpha1.AllocateTypePod,
 				K8sPodName: "podName",
 				K8sPodNs:   "podNs",
 			},
@@ -145,7 +145,7 @@ func TestReallocateIP(t *testing.T) {
 			name: "reallocate IP with pool",
 			conf: NetConf{
 				Pool:             "pool1",
-				Type:             v1alpha1.AllocatedTypeCNIUsed,
+				Type:             v1alpha1.AllocateTypeCNIUsed,
 				AllocateIdentify: "123455",
 				K8sPodName:       "podName",
 				K8sPodNs:         "podNs",
@@ -165,7 +165,7 @@ func TestReallocateIP(t *testing.T) {
 			conf: NetConf{
 				Pool:             "pool1",
 				IP:               "10.1.1.3",
-				Type:             v1alpha1.AllocatedTypeCNIUsed,
+				Type:             v1alpha1.AllocateTypeCNIUsed,
 				AllocateIdentify: "123455",
 				K8sPodName:       "podName",
 				K8sPodNs:         "podNs",
@@ -231,7 +231,7 @@ var _ = Describe("ipam", func() {
 			Context("ippool has enough IP", func() {
 				It("first allocate IP in ippool for type pod", func() {
 					c := NetConf{
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -246,7 +246,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.Offset).Should(Equal(int64(1)))
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 					}, timeout, interval).Should(Succeed())
 				})
 				When("ippool has allocated some IP", func() {
@@ -261,7 +261,7 @@ var _ = Describe("ipam", func() {
 					})
 					It("allocate next IP for type cniused", func() {
 						c := NetConf{
-							Type:             v1alpha1.AllocatedTypeCNIUsed,
+							Type:             v1alpha1.AllocateTypeCNIUsed,
 							K8sPodName:       "pod1",
 							K8sPodNs:         "ns1",
 							AllocateIdentify: "identity",
@@ -277,8 +277,8 @@ var _ = Describe("ipam", func() {
 							g.Expect(ippool.Status.Offset).Should(Equal(int64(2)))
 							g.Expect(ippool.Status.UsedIps).Should(BeNil())
 							g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
-							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod}))
-							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "identity", Type: v1alpha1.AllocatedTypeCNIUsed}))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocateTypePod}))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "identity", Type: v1alpha1.AllocateTypeCNIUsed}))
 						}, timeout, interval).Should(Succeed())
 					})
 				})
@@ -296,7 +296,7 @@ var _ = Describe("ipam", func() {
 
 					It("allocate valid IP", func() {
 						c := NetConf{
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
@@ -312,8 +312,8 @@ var _ = Describe("ipam", func() {
 							g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
 							g.Expect(ippool.Status.UsedIps).Should(HaveKeyWithValue("10.10.65.0", "containerID"))
 							g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
-							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.2", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod}))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.2", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocateTypePod}))
 						}, timeout, interval).Should(Succeed())
 					})
 				})
@@ -330,7 +330,7 @@ var _ = Describe("ipam", func() {
 				})
 				It("can't allocate IP", func() {
 					c := NetConf{
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -353,7 +353,7 @@ var _ = Describe("ipam", func() {
 				})
 				It("reallocate the same IP", func() {
 					c := NetConf{
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod-exist",
 						K8sPodNs:   "ns-exist",
 					}
@@ -369,7 +369,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
 						g.Expect(ippool.Status.UsedIps).Should(HaveKeyWithValue("10.10.65.0", "containerID"))
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod}))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocateTypePod}))
 					}, timeout, interval).Should(Succeed())
 				})
 			})
@@ -381,7 +381,7 @@ var _ = Describe("ipam", func() {
 			})
 			It("skip subnet first IP", func() {
 				c := NetConf{
-					Type:       v1alpha1.AllocatedTypePod,
+					Type:       v1alpha1.AllocateTypePod,
 					K8sPodName: "pod1",
 					K8sPodNs:   "ns1",
 				}
@@ -396,7 +396,7 @@ var _ = Describe("ipam", func() {
 					g.Expect(ippool.Status.Offset).Should(Equal(int64(2)))
 					g.Expect(ippool.Status.UsedIps).Should(BeNil())
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 				}, timeout, interval).Should(Succeed())
 			})
 			When("next IP is gateway", func() {
@@ -411,7 +411,7 @@ var _ = Describe("ipam", func() {
 				})
 				It("skip gateway", func() {
 					c := NetConf{
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -427,7 +427,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
 						g.Expect(ippool.Status.UsedIps).Should(HaveKeyWithValue("12.10.64.1", "containerID"))
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 					}, timeout, interval).Should(Succeed())
 				})
 			})
@@ -444,7 +444,7 @@ var _ = Describe("ipam", func() {
 				})
 				It("can't allocate IP", func() {
 					c := NetConf{
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -472,7 +472,7 @@ var _ = Describe("ipam", func() {
 				})
 				It("allocate from secondary pool", func() {
 					c := NetConf{
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -487,7 +487,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.Offset).Should(Equal(int64(2)))
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 					}, timeout, interval).Should(Succeed())
 				})
 			})
@@ -495,7 +495,7 @@ var _ = Describe("ipam", func() {
 				It("allocate IP from specified pool", func() {
 					c := NetConf{
 						Pool:       "pool2",
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -510,7 +510,7 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.Offset).Should(Equal(int64(2)))
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 					}, timeout, interval).Should(Succeed())
 				})
 				When("a pod request IP in a second time", func() {
@@ -527,7 +527,7 @@ var _ = Describe("ipam", func() {
 						It("allocate new IP from specified pool", func() {
 							c := NetConf{
 								Pool:       "pool1",
-								Type:       v1alpha1.AllocatedTypePod,
+								Type:       v1alpha1.AllocateTypePod,
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
@@ -542,7 +542,7 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.Offset).Should(Equal(int64(1)))
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 							}, timeout, interval).Should(Succeed())
 						})
 					})
@@ -550,7 +550,7 @@ var _ = Describe("ipam", func() {
 						It("reallocate the same IP", func() {
 							c := NetConf{
 								Pool:       "pool2",
-								Type:       v1alpha1.AllocatedTypePod,
+								Type:       v1alpha1.AllocateTypePod,
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
@@ -565,7 +565,7 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.Offset).Should(Equal(int64(4)))
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 							}, timeout, interval).Should(Succeed())
 						})
 					})
@@ -574,7 +574,7 @@ var _ = Describe("ipam", func() {
 					It("can't allocate IP", func() {
 						c := NetConf{
 							Pool:       "pool-unexist",
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
@@ -584,12 +584,12 @@ var _ = Describe("ipam", func() {
 					})
 				})
 			})
-			When("specify static IP", func() {
+			When("specify IP", func() {
 				It("allocate specified IP", func() {
 					c := NetConf{
 						Pool:       "pool1",
 						IP:         "10.10.65.3",
-						Type:       v1alpha1.AllocatedTypePod,
+						Type:       v1alpha1.AllocateTypePod,
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
@@ -604,10 +604,34 @@ var _ = Describe("ipam", func() {
 						g.Expect(ippool.Status.Offset).Should(Equal(int64(0)))
 						g.Expect(ippool.Status.UsedIps).Should(BeNil())
 						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 					}, timeout, interval).Should(Succeed())
 				})
-				When("a pod request IP in a second time", func() {
+
+				It("allocate specified IP for type statefulset", func() {
+					c := NetConf{
+						Pool:       "pool1",
+						IP:         "10.10.65.3",
+						Type:       v1alpha1.AllocateTypeStatefulSet,
+						K8sPodName: "pod1",
+						K8sPodNs:   "ns1",
+						Owner:      "ns1/sts1",
+					}
+					res, err := ipam.ExecAdd(&c)
+					Expect(err).ToNot(HaveOccurred())
+					exp := makeCNIIPconfig("10.10.65.3", pool1mask, pool1GW)
+					Expect(*res.IPs[0]).To(Equal(*exp))
+					Eventually(func(g Gomega) {
+						ippool := v1alpha1.IPPool{}
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+						g.Expect(ippool.Status).ShouldNot(BeNil())
+						g.Expect(ippool.Status.Offset).Should(Equal(int64(0)))
+						g.Expect(ippool.Status.UsedIps).Should(BeNil())
+						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1"}))
+					}, timeout, interval).Should(Succeed())
+				})
+				When("a pod request IP in a second time for type pod", func() {
 					BeforeEach(func() {
 						ippool := v1alpha1.IPPool{}
 						Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool)).Should(Succeed())
@@ -622,7 +646,7 @@ var _ = Describe("ipam", func() {
 							c := NetConf{
 								Pool:       "pool2",
 								IP:         "12.10.64.6",
-								Type:       v1alpha1.AllocatedTypePod,
+								Type:       v1alpha1.AllocateTypePod,
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
@@ -637,8 +661,8 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.Offset).Should(Equal(int64(6)))
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
-								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
-								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.6", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
+								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.6", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 							}, timeout, interval).Should(Succeed())
 						})
 					})
@@ -647,7 +671,7 @@ var _ = Describe("ipam", func() {
 							c := NetConf{
 								Pool:       "pool2",
 								IP:         "12.10.64.5",
-								Type:       v1alpha1.AllocatedTypePod,
+								Type:       v1alpha1.AllocateTypePod,
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
@@ -662,9 +686,69 @@ var _ = Describe("ipam", func() {
 								g.Expect(ippool.Status.Offset).Should(Equal(int64(6)))
 								g.Expect(ippool.Status.UsedIps).Should(BeNil())
 								g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+								g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 							}, timeout, interval).Should(Succeed())
 						})
+					})
+				})
+				When("a pod request IP in a second time for type statefulset", func() {
+					BeforeEach(func() {
+						ippool := v1alpha1.IPPool{}
+						Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool)).Should(Succeed())
+						ippool.Status = v1alpha1.IPPoolStatus{
+							Offset: 6,
+						}
+						ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+						ippool.Status.AllocatedIPs["12.10.64.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1", ID: "ns1/pod1"}
+						Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+					})
+					It("reallocate the same IP", func() {
+						c := NetConf{
+							Pool:       "pool2",
+							IP:         "12.10.64.5",
+							Type:       v1alpha1.AllocateTypeStatefulSet,
+							K8sPodName: "pod1",
+							K8sPodNs:   "ns1",
+							Owner:      "ns1/sts1",
+						}
+						res, err := ipam.ExecAdd(&c)
+						Expect(err).ToNot(HaveOccurred())
+						exp := makeCNIIPconfig("12.10.64.5", pool2mask, pool2GW)
+						Expect(*res.IPs[0]).To(Equal(*exp))
+						Eventually(func(g Gomega) {
+							ippool := v1alpha1.IPPool{}
+							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool)).Should(Succeed())
+							g.Expect(ippool.Status).ShouldNot(BeNil())
+							g.Expect(ippool.Status.Offset).Should(Equal(int64(6)))
+							g.Expect(ippool.Status.UsedIps).Should(BeNil())
+							g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("12.10.64.5", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1"}))
+						}, timeout, interval).Should(Succeed())
+					})
+					It("can't reallocate IP for type different", func() {
+						c := NetConf{
+							Pool:       "pool2",
+							IP:         "12.10.64.5",
+							Type:       v1alpha1.AllocateTypePod,
+							K8sPodName: "pod1",
+							K8sPodNs:   "ns1",
+						}
+						_, err := ipam.ExecAdd(&c)
+						allocateInfo := v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1"}
+						Expect(err).Should(MatchError(fmt.Sprintf("static ip %s is already in use by %v", c.IP, allocateInfo)))
+					})
+					It("can't reallocate IP for owner different", func() {
+						c := NetConf{
+							Pool:       "pool2",
+							IP:         "12.10.64.5",
+							Type:       v1alpha1.AllocateTypeStatefulSet,
+							K8sPodName: "pod1",
+							K8sPodNs:   "ns1",
+							Owner:      "ns1/sts2",
+						}
+						_, err := ipam.ExecAdd(&c)
+						allocateInfo := v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1"}
+						Expect(err).Should(MatchError(fmt.Sprintf("static ip %s is already in use by %v", c.IP, allocateInfo)))
 					})
 				})
 				When("specified static IP has been used", func() {
@@ -681,7 +765,7 @@ var _ = Describe("ipam", func() {
 						c := NetConf{
 							Pool:       "pool2",
 							IP:         "12.10.64.5",
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
@@ -704,14 +788,14 @@ var _ = Describe("ipam", func() {
 						c := NetConf{
 							Pool:       "pool2",
 							IP:         "12.10.64.5",
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
 						res, err := ipam.ExecAdd(&c)
 						Expect(res).Should(BeNil())
 						Expect(err).Should(MatchError(fmt.Sprintf("static ip 12.10.64.5 is already in use by %v",
-							v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocatedTypePod})))
+							v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocateTypePod})))
 					})
 				})
 				When("specified static IP doesn't in pool", func() {
@@ -719,7 +803,7 @@ var _ = Describe("ipam", func() {
 						c := NetConf{
 							Pool:       "pool2",
 							IP:         "13.10.64.5",
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
@@ -733,7 +817,7 @@ var _ = Describe("ipam", func() {
 						c := NetConf{
 							Pool:       "pool2",
 							IP:         "13.10.64",
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
@@ -747,7 +831,7 @@ var _ = Describe("ipam", func() {
 						c := NetConf{
 							Pool:       "pool-unexist",
 							IP:         "12.10.64.5",
-							Type:       v1alpha1.AllocatedTypePod,
+							Type:       v1alpha1.AllocateTypePod,
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
@@ -775,7 +859,7 @@ var _ = Describe("ipam", func() {
 		})
 		It("release by usedIP", func() {
 			c := NetConf{
-				Type:             v1alpha1.AllocatedTypePod,
+				Type:             v1alpha1.AllocateTypePod,
 				AllocateIdentify: "containerID",
 				K8sPodName:       "pod-unexist",
 				K8sPodNs:         "ns-unexist",
@@ -793,7 +877,7 @@ var _ = Describe("ipam", func() {
 		When("release by allocate info", func() {
 			It("for type cniused", func() {
 				c := NetConf{
-					Type:             v1alpha1.AllocatedTypeCNIUsed,
+					Type:             v1alpha1.AllocateTypeCNIUsed,
 					AllocateIdentify: "cniusedID",
 				}
 				_ = ipam.ExecDel(&c)
@@ -804,31 +888,61 @@ var _ = Describe("ipam", func() {
 					g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
 					g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocatedTypePod}))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod}))
 				}, timeout, interval).Should(Succeed())
 			})
-			It("for type pod", func() {
-				c := NetConf{
-					Type:             v1alpha1.AllocatedTypePod,
-					AllocateIdentify: "cniusedID",
-					K8sPodName:       "pod1",
-					K8sPodNs:         "ns1",
-				}
-				_ = ipam.ExecDel(&c)
-				Eventually(func(g Gomega) {
-					ippool := v1alpha1.IPPool{}
-					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
-					g.Expect(ippool.Status).ShouldNot(BeNil())
-					g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
-					g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
-					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "cniusedID", Type: v1alpha1.AllocatedTypeCNIUsed}))
-				}, timeout, interval).Should(Succeed())
+			When("for type pod", func() {
+				It("release for allocate type pod", func() {
+					c := NetConf{
+						Type:             v1alpha1.AllocateTypePod,
+						AllocateIdentify: "cniusedID",
+						K8sPodName:       "pod1",
+						K8sPodNs:         "ns1",
+					}
+					_ = ipam.ExecDel(&c)
+					Eventually(func(g Gomega) {
+						ippool := v1alpha1.IPPool{}
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+						g.Expect(ippool.Status).ShouldNot(BeNil())
+						g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
+						g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
+						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "cniusedID", Type: v1alpha1.AllocateTypeCNIUsed}))
+					}, timeout, interval).Should(Succeed())
+				})
+
+				When("for allocate type statefulset", func() {
+					BeforeEach(func() {
+						ippool := v1alpha1.IPPool{}
+						Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+						ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ns1/pod1", Owner: "ns1/sts1"}
+						Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+					})
+					It("doesn't release", func() {
+						c := NetConf{
+							Type:             v1alpha1.AllocateTypePod,
+							AllocateIdentify: "cniusedID",
+							K8sPodName:       "pod1",
+							K8sPodNs:         "ns1",
+						}
+						_ = ipam.ExecDel(&c)
+						Eventually(func(g Gomega) {
+							ippool := v1alpha1.IPPool{}
+							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+							g.Expect(ippool.Status).ShouldNot(BeNil())
+							g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
+							g.Expect(len(ippool.Status.UsedIps)).Should(Equal(1))
+							g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.1", v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ns1/pod1", Owner: "ns1/sts1"}))
+							g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "cniusedID", Type: v1alpha1.AllocateTypeCNIUsed}))
+						}, timeout, interval).Should(Succeed())
+					})
+				})
 			})
 		})
 		It("release unexist", func() {
 			c := NetConf{
-				Type:       v1alpha1.AllocatedTypePod,
+				Type:       v1alpha1.AllocateTypePod,
 				K8sPodName: "pod-unexist",
 				K8sPodNs:   "ns-unexist",
 			}
@@ -856,7 +970,7 @@ var _ = Describe("ipam", func() {
 			})
 			It("release by usedIP and allocateinfo", func() {
 				c := NetConf{
-					Type:             v1alpha1.AllocatedTypePod,
+					Type:             v1alpha1.AllocateTypePod,
 					AllocateIdentify: "containerID",
 					K8sPodName:       "pod1",
 					K8sPodNs:         "ns1",
@@ -869,7 +983,7 @@ var _ = Describe("ipam", func() {
 					g.Expect(ippool.Status.Offset).Should(Equal(int64(3)))
 					g.Expect(len(ippool.Status.UsedIps)).Should(Equal(0))
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
-					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "cniusedID", Type: v1alpha1.AllocatedTypeCNIUsed}))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.3", v1alpha1.AllocateInfo{ID: "cniusedID", Type: v1alpha1.AllocateTypeCNIUsed}))
 
 					ippool = v1alpha1.IPPool{}
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool)).Should(Succeed())

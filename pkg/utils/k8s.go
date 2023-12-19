@@ -6,7 +6,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func GetAllocateIDFromPod(podNs, podName string) string {
+func GenOwner(ownerNs, ownerName string) string {
+	return ownerNs + "/" + ownerName
+}
+
+func GenAllocateIDFromPod(podNs, podName string) string {
 	return podNs + "/" + podName
 }
 
