@@ -141,6 +141,11 @@ func (i *Ipam) ExecDel(conf *NetConf) error {
 		return nil
 	}
 
+	// for statefulset specify ip list, doesn't release ip when pod delete
+	if conf.Type == v1alpha1.AllocateTypeStatefulSet {
+		return nil
+	}
+
 	ipPools := v1alpha1.IPPoolList{}
 	if err := i.k8sClient.List(context.Background(), &ipPools); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
@@ -237,6 +242,10 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 				}
 			}
 			for k, v := range pool.Status.AllocatedIPs {
+				// for statefulset specify ip list, doesn't release ip when pod delete
+				if v.Type == v1alpha1.AllocateTypeStatefulSet {
+					continue
+				}
 				if v.Type == conf.Type && v.ID == conf.getAllocateID() {
 					delete(pool.Status.AllocatedIPs, k)
 					if pool.Status.Offset == constants.IPPoolOffsetFull {
@@ -297,6 +306,10 @@ func (i *Ipam) FetchGwbyIP(ip net.IP) net.IP {
 	return nil
 }
 
+func (i *Ipam) GetNamespace() string {
+	return i.namespace
+}
+
 func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
 	if conf.Pool != "" && conf.Pool != ipPool.Name {
 		return ""
@@ -321,5 +334,5 @@ func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
 
 func isSameAllocateInfo(allocateInfo v1alpha1.AllocateInfo, conf *NetConf) bool {
 	allocateID := conf.getAllocateID()
-	return allocateInfo.Type == conf.Type && allocateInfo.ID == allocateID
+	return allocateInfo.Type == conf.Type && allocateInfo.ID == allocateID && allocateInfo.Owner == conf.Owner
 }

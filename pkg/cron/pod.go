@@ -35,7 +35,7 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client) {
 		}
 		delIPs := make([]string, 0)
 		for ip, allo := range ippool.Status.AllocatedIPs {
-			if allo.Type != v1alpha1.AllocatedTypePod {
+			if allo.Type != v1alpha1.AllocateTypePod {
 				continue
 			}
 			podNsName := utils.GetPodNsNameByAllocateID(allo.ID)

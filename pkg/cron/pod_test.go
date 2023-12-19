@@ -101,9 +101,9 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
 				ippool.Status.Offset = constants.IPPoolOffsetFull
 				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + pod1Name}
-				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypeCNIUsed, ID: "dfgggg"}
-				ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + "pod-unexist"}
+				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
 				Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
 			})
 			It("clean stale IP", func() {
@@ -131,9 +131,9 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
 				ippool.Status.Offset = 1
 				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + pod1Name}
-				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypeCNIUsed, ID: "dfgggg"}
-				ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + "pod-unexist"}
+				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
 				Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
 			})
 			It("clean stale IP", func() {
@@ -163,17 +163,17 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
 			ippool.Status.Offset = 1
 			ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-			ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + pod1Name}
-			ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypeCNIUsed, ID: "dfgggg"}
-			ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + "pod-unexist"}
+			ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
+			ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+			ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
 			Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
 			ippool2 := v1alpha1.IPPool{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool2)).Should(Succeed())
 			ippool2.Status.Offset = constants.IPPoolOffsetFull
 			ippool2.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-			ippool2.Status.AllocatedIPs["12.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + pod2Name}
-			ippool2.Status.AllocatedIPs["12.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypeCNIUsed, ID: "dfgggg"}
-			ippool2.Status.AllocatedIPs["12.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocatedTypePod, ID: ns + "/" + "pod-unexist"}
+			ippool2.Status.AllocatedIPs["12.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod2Name}
+			ippool2.Status.AllocatedIPs["12.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+			ippool2.Status.AllocatedIPs["12.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
 			Expect(k8sClient.Status().Update(ctx, &ippool2)).Should(Succeed())
 		})
 		It("clean stale up", func() {

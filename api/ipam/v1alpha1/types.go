@@ -50,16 +50,19 @@ type IPPoolStatus struct {
 }
 
 type AllocateInfo struct {
-	ID string `json:"id"`
 	// Type=pod, ID=podns/name
+	ID   string       `json:"id"`
 	Type AllocateType `json:"type,omitempty"`
+	// Type=statefulset, owner=statefulsetns/name
+	Owner string `json:"owner,omitempty"`
 }
 
 type AllocateType string
 
 const (
-	AllocatedTypeCNIUsed AllocateType = "cniused"
-	AllocatedTypePod     AllocateType = "pod"
+	AllocateTypeCNIUsed     AllocateType = "cniused"
+	AllocateTypePod         AllocateType = "pod"
+	AllocateTypeStatefulSet AllocateType = "statefulset"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
