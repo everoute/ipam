@@ -23,6 +23,7 @@ func NewCleanStaleIP(period time.Duration, k8sClient client.Client) *CleanStaleI
 		processFuncs: make([]ProcessFun, 0),
 	}
 	c.RegistryCleanFunc(cleanStaleIPForPod)
+	c.RegistryCleanFunc(cleanStaleIPForStatefulSet)
 
 	return &c
 }

@@ -1,11 +1,11 @@
 package cron
 
 import (
-	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,7 +15,7 @@ import (
 	"github.com/everoute/ipam/pkg/constants"
 )
 
-var _ = Describe("clean_stale_ip_for_pod", func() {
+var _ = Describe("clean_stale_ip", func() {
 	pod1Name := "pod1"
 	pod1 := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -46,13 +46,40 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 			},
 		},
 	}
+	sts1Name := "sts1"
+	podLabel := make(map[string]string, 1)
+	podLabel["Owner"] = sts1Name
+	sts1 := appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sts1Name,
+			Namespace: ns,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: podLabel,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabel,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "test",
+							Image: "network",
+						},
+					},
+				},
+			},
+		},
+	}
 	pool1 := v1alpha1.IPPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pool1",
 			Namespace: ns,
 		},
 		Spec: v1alpha1.IPPoolSpec{
-			CIDR:    "10.10.65.0/30",
+			CIDR:    "10.10.65.0/28",
 			Subnet:  "10.10.64.0/20",
 			Gateway: "10.10.65.1",
 		},
@@ -68,7 +95,6 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 			Gateway: "12.10.64.1",
 		},
 	}
-	var cronCancel context.CancelFunc
 	BeforeEach(func() {
 		By("setup resources")
 		pod1Copy := pod1.DeepCopy()
@@ -79,22 +105,17 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 		Expect(k8sClient.Create(ctx, pool1Copy)).Should(Succeed())
 		pool2Copy := pool2.DeepCopy()
 		Expect(k8sClient.Create(ctx, pool2Copy)).Should(Succeed())
-
-		By("cleanStaleIP.Run")
-		var cronCtx context.Context
-		cronCtx, cronCancel = context.WithCancel(ctx)
-		cleanStaleIP.Run(cronCtx)
+		sts1Copy := sts1.DeepCopy()
+		Expect(k8sClient.Create(ctx, sts1Copy)).Should(Succeed())
 	})
 	AfterEach(func() {
 		By("clean resources")
 		Expect(k8sClient.DeleteAllOf(ctx, &v1alpha1.IPPool{}, client.InNamespace(ns))).Should(Succeed())
 		Expect(k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(ns))).Should(Succeed())
-
-		By("stop cleanStaleIP")
-		cronCancel()
+		Expect(k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(ns))).Should(Succeed())
 	})
 
-	Context("single pool has stale IP in pool", func() {
+	Context("single pool has stale IP for Pod in pool", func() {
 		When("pool has full", func() {
 			BeforeEach(func() {
 				ippool := v1alpha1.IPPool{}
@@ -104,6 +125,7 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
 				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
 				ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
+				ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
 				Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
 			})
 			It("clean stale IP", func() {
@@ -113,10 +135,11 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
 					By("should reset offset")
 					g.Expect(ippool.Status.Offset).Should(Equal(int64(constants.IPPoolOffsetReset)))
-					By("should cleanup stale IP")
-					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
+					By("should cleanup stale IP for Pod")
+					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(3))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.1"))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.2"))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.4"))
 					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.3"))
 					By("another pool doesn't change")
 					ippool2 := v1alpha1.IPPool{}
@@ -157,6 +180,77 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 		})
 	})
 
+	Context("single pool has stale IP for StatefulSet in pool", func() {
+		When("pool has full", func() {
+			BeforeEach(func() {
+				ippool := v1alpha1.IPPool{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+				ippool.Status.Offset = constants.IPPoolOffsetFull
+				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+				ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
+				ippool.Status.AllocatedIPs["10.10.65.7"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
+				Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+			})
+			It("clean stale IP", func() {
+				time.Sleep(period)
+				Eventually(func(g Gomega) {
+					ippool := v1alpha1.IPPool{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+					By("should reset offset")
+					g.Expect(ippool.Status.Offset).Should(Equal(int64(constants.IPPoolOffsetReset)))
+					By("should cleanup stale IP for StatefulSet")
+					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(3))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.1"))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.2"))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.4"))
+					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.5"))
+					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.7"))
+					By("another pool doesn't change")
+					ippool2 := v1alpha1.IPPool{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool2)).Should(Succeed())
+					g.Expect(ippool2.Status.AllocatedIPs).Should(BeNil())
+				}, timeout, interval).Should(Succeed())
+			})
+		})
+		When("pool doesn't full", func() {
+			BeforeEach(func() {
+				ippool := v1alpha1.IPPool{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+				ippool.Status.Offset = 1
+				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+				ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
+				ippool.Status.AllocatedIPs["10.10.65.7"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
+				Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+			})
+			It("clean stale IP", func() {
+				time.Sleep(period)
+				Eventually(func(g Gomega) {
+					ippool := v1alpha1.IPPool{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+					By("shouldn't change offset")
+					g.Expect(ippool.Status.Offset).Should(Equal(int64(1)))
+					By("should cleanup stale IP for StatefulSet")
+					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(3))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.1"))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.2"))
+					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.4"))
+					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.5"))
+					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.7"))
+					By("another pool doesn't change")
+					ippool2 := v1alpha1.IPPool{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool2)).Should(Succeed())
+					g.Expect(ippool2.Status.AllocatedIPs).Should(BeNil())
+				}, timeout, interval).Should(Succeed())
+			})
+		})
+	})
+
 	Context("multi pool has stale IP in pool", func() {
 		BeforeEach(func() {
 			ippool := v1alpha1.IPPool{}
@@ -166,6 +260,8 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 			ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
 			ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
 			ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
+			ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+			ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
 			Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
 			ippool2 := v1alpha1.IPPool{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool2)).Should(Succeed())
@@ -174,9 +270,13 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 			ippool2.Status.AllocatedIPs["12.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod2Name}
 			ippool2.Status.AllocatedIPs["12.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
 			ippool2.Status.AllocatedIPs["12.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
+			ippool2.Status.AllocatedIPs["12.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+			ippool2.Status.AllocatedIPs["12.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
+			ippool2.Status.AllocatedIPs["12.10.65.7"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/sts-unexist"}
+
 			Expect(k8sClient.Status().Update(ctx, &ippool2)).Should(Succeed())
 		})
-		It("clean stale up", func() {
+		It("clean stale ip", func() {
 			time.Sleep(period)
 			Eventually(func(g Gomega) {
 				ippool := v1alpha1.IPPool{}
@@ -184,17 +284,24 @@ var _ = Describe("clean_stale_ip_for_pod", func() {
 				By("shouldn't change offset")
 				g.Expect(ippool.Status.Offset).Should(Equal(int64(1)))
 				By("should cleanup stale IP")
-				g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
+				g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(3))
 				g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.1"))
 				g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.2"))
+				g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.4"))
 				g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.3"))
+				g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.5"))
 
 				ippool2 := v1alpha1.IPPool{}
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool2"}, &ippool2)).Should(Succeed())
+				By("should reset offset")
 				g.Expect(ippool2.Status.Offset).Should(Equal(int64(constants.IPPoolOffsetReset)))
+				By("should cleanup stale IP")
 				g.Expect(ippool2.Status.AllocatedIPs).Should(HaveKey("12.10.65.1"))
 				g.Expect(ippool2.Status.AllocatedIPs).Should(HaveKey("12.10.65.2"))
+				g.Expect(ippool2.Status.AllocatedIPs).Should(HaveKey("12.10.65.4"))
 				g.Expect(ippool2.Status.AllocatedIPs).ShouldNot(HaveKey("12.10.65.3"))
+				g.Expect(ippool2.Status.AllocatedIPs).ShouldNot(HaveKey("12.10.65.5"))
+				g.Expect(ippool2.Status.AllocatedIPs).ShouldNot(HaveKey("12.10.65.7"))
 			}, timeout, interval).Should(Succeed())
 		})
 	})
