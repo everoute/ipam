@@ -51,6 +51,9 @@ func (r *IPPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 
 func (r *IPPool) ValidateDelete() (admission.Warnings, error) {
 	klog.Infoln("validate delete ippool name is ", r.Namespace+`/`+r.Name)
+	if len(r.Status.AllocatedIPs) != 0 || len(r.Status.UsedIps) != 0 {
+		return nil, fmt.Errorf("IPPool has allocated IP, can't delete")
+	}
 	_ = ValidatePool(IPPoolList{Items: []IPPool{}}, IPPool{}, r.Namespace+`/`+r.Name)
 	return nil, nil
 }
