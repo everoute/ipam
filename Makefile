@@ -22,6 +22,10 @@ test:
 
 docker-test: image-test
 	$(eval WORKDIR := /go/src/github.com/everoute/ipam)
+	docker run --rm -iu 0:0 -w $(WORKDIR) -v $(CURDIR):$(WORKDIR) localhost/unit-test make test
+
+debug-test: image-test
+	$(eval WORKDIR := /go/src/github.com/everoute/ipam)
 	docker run --rm -iu 0:0 -w $(WORKDIR) -v $(CURDIR):$(WORKDIR) localhost/unit-test bash
 
 prefix:
