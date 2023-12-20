@@ -1,4 +1,4 @@
-package cron
+package controller
 
 import (
 	"context"
@@ -20,22 +20,21 @@ import (
 )
 
 var (
-	k8sClient    client.Client
-	testEnv      *envtest.Environment
-	cleanStaleIP *CleanStaleIP
-	period       = 5 * time.Second
-	ns           = "cron-test"
-	ctx          = context.Background()
-	interval     = 1 * time.Second
-	timeout      = 10 * time.Second
+	testEnv     *envtest.Environment
+	k8sClient   client.Client
+	ns          = "test-controller"
+	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
+	interval    = 1 * time.Second
+	timeout     = 1 * time.Minute
 )
 
 var _ = BeforeSuite(func() {
 	By("setup test enviroment")
 	notExistCluster := false
 	testEnv = &envtest.Environment{
-		UseExistingCluster:    &notExistCluster,
-		BinaryAssetsDirectory: "/usr/local/bin",
+		ControlPlaneStopTimeout: 60 * time.Second,
+		UseExistingCluster:      &notExistCluster,
+		BinaryAssetsDirectory:   "/usr/local/bin",
 		CRDInstallOptions: envtest.CRDInstallOptions{
 			Paths:              []string{filepath.Join("..", "..", "deploy", "crds")},
 			CleanUpAfterUse:    true,
@@ -44,14 +43,24 @@ var _ = BeforeSuite(func() {
 	}
 	cfg, err := testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
+	Expect(cfg).ShouldNot(BeNil())
 
-	By("get k8sClient")
+	By("init k8s manager")
 	scheme := scheme.Scheme
 	Expect(corev1.AddToScheme(scheme)).Should(Succeed())
 	Expect(v1alpha1.AddToScheme(scheme)).Should(Succeed())
 	Expect(appsv1.AddToScheme(scheme)).Should(Succeed())
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme,
+	})
 	Expect(err).ToNot(HaveOccurred())
+	Expect(mgr).ToNot(BeNil())
+
+	By("setup statefulset controller")
+	Expect((&STSReconciler{Client: mgr.GetClient()}).SetUpWithManager(mgr)).Should(Succeed())
+
+	By("get k8sClient")
+	k8sClient = mgr.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 
 	By("create namespace")
@@ -62,19 +71,21 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(k8sClient.Create(ctx, &nsObj)).Should(Succeed())
 
-	By("init CleanStaleIP")
-	cleanStaleIP = NewCleanStaleIP(period, k8sClient)
-
-	By("cleanStaleIP.Run")
-	cleanStaleIP.Run(ctrl.SetupSignalHandler())
+	By("start mgr")
+	go func() {
+		Expect(mgr.Start(ctx)).Should(Succeed())
+	}()
 })
 
 var _ = AfterSuite(func() {
+	By("stop controller manager")
+	cancel()
+
 	By("tearing down the test environment")
 	Expect(testEnv.Stop()).Should(Succeed())
 })
 
-func TestCron(t *testing.T) {
+func TestController(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "cron Suite")
+	RunSpecs(t, "Controller suit")
 }

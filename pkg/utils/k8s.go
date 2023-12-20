@@ -25,3 +25,15 @@ func GetPodNsNameByAllocateID(id string) types.NamespacedName {
 
 	return types.NamespacedName{}
 }
+
+func GetNsNameByAllocateOwner(owner string) types.NamespacedName {
+	strs := strings.Split(owner, "/")
+	if len(strs) == 2 {
+		return types.NamespacedName{
+			Namespace: strs[0],
+			Name:      strs[1],
+		}
+	}
+
+	return types.NamespacedName{}
+}
