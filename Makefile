@@ -8,8 +8,10 @@ image-generate:
 image-test:
 	docker build -f build/image/unit-test/Dockerfile -t localhost/unit-test ./build/image/unit-test/
 
-generate: prefix manifests
-	
+generate: manifests codegen prefix
+
+codegen:
+	deepcopy-gen -O zz_generated.deepcopy --go-header-file ./hack/boilerplate.generatego.txt --input-dirs ./api/ipam/...
 
 docker-generate: image-generate
 	$(eval WORKDIR := /go/src/github.com/everoute/ipam)
