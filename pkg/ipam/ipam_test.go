@@ -235,7 +235,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("10.10.65.0", pool1mask, pool1GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -266,7 +266,7 @@ var _ = Describe("ipam", func() {
 							K8sPodNs:         "ns1",
 							AllocateIdentify: "identity",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(err).ToNot(HaveOccurred())
 						exp := makeCNIIPconfig("10.10.65.1", pool1mask, pool1GW)
 						Expect(*res.IPs[0]).To(Equal(*exp))
@@ -300,7 +300,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(err).ToNot(HaveOccurred())
 						exp := makeCNIIPconfig("10.10.65.2", pool1mask, pool1GW)
 						Expect(*res.IPs[0]).To(Equal(*exp))
@@ -334,7 +334,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(res).Should(BeNil())
 					Expect(err).Should(MatchError("no IP address allocated in all pools"))
 				})
@@ -357,7 +357,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod-exist",
 						K8sPodNs:   "ns-exist",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("10.10.65.1", pool1mask, pool1GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -385,7 +385,7 @@ var _ = Describe("ipam", func() {
 					K8sPodName: "pod1",
 					K8sPodNs:   "ns1",
 				}
-				res, err := ipam.ExecAdd(&c)
+				res, err := ipam.ExecAdd(ctx, &c)
 				Expect(err).ToNot(HaveOccurred())
 				exp := makeCNIIPconfig("12.10.64.1", pool2mask, pool2GW)
 				Expect(*res.IPs[0]).To(Equal(*exp))
@@ -415,7 +415,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("12.10.64.3", pool2mask, pool2GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -448,7 +448,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(res).Should(BeNil())
 					Expect(err).Should(MatchError("find valid ip error in pool pool2"))
 				})
@@ -476,7 +476,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("12.10.64.1", pool2mask, pool2GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -499,7 +499,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("12.10.64.1", pool2mask, pool2GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -531,7 +531,7 @@ var _ = Describe("ipam", func() {
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
-							res, err := ipam.ExecAdd(&c)
+							res, err := ipam.ExecAdd(ctx, &c)
 							Expect(err).ToNot(HaveOccurred())
 							exp := makeCNIIPconfig("10.10.65.0", pool1mask, pool1GW)
 							Expect(*res.IPs[0]).To(Equal(*exp))
@@ -554,7 +554,7 @@ var _ = Describe("ipam", func() {
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
-							res, err := ipam.ExecAdd(&c)
+							res, err := ipam.ExecAdd(ctx, &c)
 							Expect(err).ToNot(HaveOccurred())
 							exp := makeCNIIPconfig("12.10.64.3", pool2mask, pool2GW)
 							Expect(*res.IPs[0]).To(Equal(*exp))
@@ -578,7 +578,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(res).Should(BeNil())
 						Expect(err).ShouldNot(BeNil())
 					})
@@ -593,7 +593,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName: "pod1",
 						K8sPodNs:   "ns1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("10.10.65.3", pool1mask, pool1GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -617,7 +617,7 @@ var _ = Describe("ipam", func() {
 						K8sPodNs:   "ns1",
 						Owner:      "ns1/sts1",
 					}
-					res, err := ipam.ExecAdd(&c)
+					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(err).ToNot(HaveOccurred())
 					exp := makeCNIIPconfig("10.10.65.3", pool1mask, pool1GW)
 					Expect(*res.IPs[0]).To(Equal(*exp))
@@ -650,7 +650,7 @@ var _ = Describe("ipam", func() {
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
-							res, err := ipam.ExecAdd(&c)
+							res, err := ipam.ExecAdd(ctx, &c)
 							Expect(err).ToNot(HaveOccurred())
 							exp := makeCNIIPconfig("12.10.64.6", pool2mask, pool2GW)
 							Expect(*res.IPs[0]).To(Equal(*exp))
@@ -675,7 +675,7 @@ var _ = Describe("ipam", func() {
 								K8sPodName: "pod1",
 								K8sPodNs:   "ns1",
 							}
-							res, err := ipam.ExecAdd(&c)
+							res, err := ipam.ExecAdd(ctx, &c)
 							Expect(err).ToNot(HaveOccurred())
 							exp := makeCNIIPconfig("12.10.64.5", pool2mask, pool2GW)
 							Expect(*res.IPs[0]).To(Equal(*exp))
@@ -711,7 +711,7 @@ var _ = Describe("ipam", func() {
 							K8sPodNs:   "ns1",
 							Owner:      "ns1/sts1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(err).ToNot(HaveOccurred())
 						exp := makeCNIIPconfig("12.10.64.5", pool2mask, pool2GW)
 						Expect(*res.IPs[0]).To(Equal(*exp))
@@ -733,7 +733,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						_, err := ipam.ExecAdd(&c)
+						_, err := ipam.ExecAdd(ctx, &c)
 						allocateInfo := v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1"}
 						Expect(err).Should(MatchError(fmt.Sprintf("static ip %s is already in use by %v", c.IP, allocateInfo)))
 					})
@@ -746,7 +746,7 @@ var _ = Describe("ipam", func() {
 							K8sPodNs:   "ns1",
 							Owner:      "ns1/sts2",
 						}
-						_, err := ipam.ExecAdd(&c)
+						_, err := ipam.ExecAdd(ctx, &c)
 						allocateInfo := v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypeStatefulSet, Owner: "ns1/sts1"}
 						Expect(err).Should(MatchError(fmt.Sprintf("static ip %s is already in use by %v", c.IP, allocateInfo)))
 					})
@@ -769,7 +769,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(res).Should(BeNil())
 						Expect(err).Should(MatchError("static ip 12.10.64.5 is already in use"))
 					})
@@ -792,7 +792,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(res).Should(BeNil())
 						Expect(err).Should(MatchError(fmt.Sprintf("static ip 12.10.64.5 is already in use by %v",
 							v1alpha1.AllocateInfo{ID: "ns-exist/pod-exist", Type: v1alpha1.AllocateTypePod})))
@@ -807,7 +807,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(res).Should(BeNil())
 						Expect(err).Should(MatchError("static ip 13.10.64.5 is not in target pool"))
 					})
@@ -821,7 +821,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(res).Should(BeNil())
 						Expect(err).Should(MatchError("invalid static ip 13.10.64"))
 					})
@@ -835,7 +835,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName: "pod1",
 							K8sPodNs:   "ns1",
 						}
-						res, err := ipam.ExecAdd(&c)
+						res, err := ipam.ExecAdd(ctx, &c)
 						Expect(res).Should(BeNil())
 						Expect(err).ShouldNot(BeNil())
 					})
@@ -864,7 +864,7 @@ var _ = Describe("ipam", func() {
 				K8sPodName:       "pod-unexist",
 				K8sPodNs:         "ns-unexist",
 			}
-			_ = ipam.ExecDel(&c)
+			_ = ipam.ExecDel(ctx, &c)
 			Eventually(func(g Gomega) {
 				ippool := v1alpha1.IPPool{}
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
@@ -880,7 +880,7 @@ var _ = Describe("ipam", func() {
 					Type:             v1alpha1.AllocateTypeCNIUsed,
 					AllocateIdentify: "cniusedID",
 				}
-				_ = ipam.ExecDel(&c)
+				_ = ipam.ExecDel(ctx, &c)
 				Eventually(func(g Gomega) {
 					ippool := v1alpha1.IPPool{}
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
@@ -899,7 +899,7 @@ var _ = Describe("ipam", func() {
 						K8sPodName:       "pod1",
 						K8sPodNs:         "ns1",
 					}
-					_ = ipam.ExecDel(&c)
+					_ = ipam.ExecDel(ctx, &c)
 					Eventually(func(g Gomega) {
 						ippool := v1alpha1.IPPool{}
 						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
@@ -925,7 +925,7 @@ var _ = Describe("ipam", func() {
 							K8sPodName:       "pod1",
 							K8sPodNs:         "ns1",
 						}
-						_ = ipam.ExecDel(&c)
+						_ = ipam.ExecDel(ctx, &c)
 						Eventually(func(g Gomega) {
 							ippool := v1alpha1.IPPool{}
 							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
@@ -946,7 +946,7 @@ var _ = Describe("ipam", func() {
 				K8sPodName: "pod-unexist",
 				K8sPodNs:   "ns-unexist",
 			}
-			_ = ipam.ExecDel(&c)
+			_ = ipam.ExecDel(ctx, &c)
 			Eventually(func(g Gomega) {
 				ippool := v1alpha1.IPPool{}
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
@@ -975,7 +975,7 @@ var _ = Describe("ipam", func() {
 					K8sPodName:       "pod1",
 					K8sPodNs:         "ns1",
 				}
-				_ = ipam.ExecDel(&c)
+				_ = ipam.ExecDel(ctx, &c)
 				Eventually(func(g Gomega) {
 					ippool := v1alpha1.IPPool{}
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())

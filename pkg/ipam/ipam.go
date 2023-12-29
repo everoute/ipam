@@ -42,7 +42,8 @@ func InitIpam(k8sClient client.Client, namespace string) *Ipam {
 	return ipam
 }
 
-func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
+//nolint:gocognit
+func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error) {
 	if err := conf.Valid(); err != nil {
 		klog.Errorf("Invalid param %v, err: %v", *conf, err)
 		return nil, err
@@ -53,7 +54,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 	// get target ip pool
 	if conf.Pool == "" {
 		ipPools := v1alpha1.IPPoolList{}
-		if err := i.k8sClient.List(context.Background(), &ipPools); err != nil {
+		if err := i.k8sClient.List(ctx, &ipPools); err != nil {
 			klog.Errorf("list ipPool error, err:%s", err)
 		}
 		for index, item := range ipPools.Items {
@@ -76,7 +77,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 			Name:      conf.Pool,
 			Namespace: i.namespace,
 		}
-		if err := i.k8sClient.Get(context.Background(), req, ipPool); err != nil {
+		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
 			return nil, fmt.Errorf("get ip pool %s error, err: %s", req, err)
 		}
 		if ip := reallocateIP(conf, ipPool); ip != "" {
@@ -107,7 +108,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 		}
 
 		// update ip address into pool
-		if err := i.UpdatePool(conf, constants.IPPoolOffsetIgnore, IPAdd); err != nil {
+		if err := i.UpdatePool(ctx, conf, constants.IPPoolOffsetIgnore, IPAdd); err != nil {
 			return nil, err
 		}
 
@@ -118,7 +119,7 @@ func (i *Ipam) ExecAdd(conf *NetConf) (*cniv1.Result, error) {
 		newIP, newOffset := i.FindNext(ipPool)
 		klog.Info(newIP, newOffset)
 		conf.IP = newIP.String()
-		if err := i.UpdatePool(conf, newOffset, IPAdd); err != nil {
+		if err := i.UpdatePool(ctx, conf, newOffset, IPAdd); err != nil {
 			klog.Error(err)
 			continue
 		}
@@ -135,7 +136,7 @@ func (i *Ipam) ExecCheck(*NetConf) error {
 	return nil
 }
 
-func (i *Ipam) ExecDel(conf *NetConf) error {
+func (i *Ipam) ExecDel(ctx context.Context, conf *NetConf) error {
 	if err := conf.Valid(); err != nil {
 		klog.Errorf("Invalid param %v, err: %v", *conf, err)
 		return nil
@@ -147,12 +148,12 @@ func (i *Ipam) ExecDel(conf *NetConf) error {
 	}
 
 	ipPools := v1alpha1.IPPoolList{}
-	if err := i.k8sClient.List(context.Background(), &ipPools); err != nil {
+	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
 	}
 	for _, item := range ipPools.Items {
 		conf.Pool = item.Name
-		_ = i.UpdatePool(conf, constants.IPPoolOffsetReset, IPDel)
+		_ = i.UpdatePool(ctx, conf, constants.IPPoolOffsetReset, IPDel)
 	}
 
 	return nil
@@ -193,7 +194,8 @@ func (i *Ipam) FindNext(ipPool *v1alpha1.IPPool) (net.IP, int64) {
 	return nil, constants.IPPoolOffsetFull
 }
 
-func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
+//nolint:gocognit
+func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op OP) error {
 	for retry := 0; retry < UpdateRetryCount; retry++ {
 		// get up-to-date pool
 		pool := &v1alpha1.IPPool{}
@@ -201,7 +203,7 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 			Name:      conf.Pool,
 			Namespace: i.namespace,
 		}
-		if err := i.k8sClient.Get(context.Background(), req, pool); err != nil {
+		if err := i.k8sClient.Get(ctx, req, pool); err != nil {
 			klog.Errorf("get ip pool error,err %s", err)
 			continue
 		}
@@ -261,7 +263,7 @@ func (i *Ipam) UpdatePool(conf *NetConf, offset int64, op OP) error {
 			return nil
 		}
 		// update status
-		err := i.k8sClient.Status().Update(context.Background(), pool)
+		err := i.k8sClient.Status().Update(ctx, pool)
 		if err == nil {
 			return nil
 		}
@@ -291,9 +293,9 @@ func (i *Ipam) ParseResult(ipPool *v1alpha1.IPPool, ip string) *cniv1.Result {
 	}
 }
 
-func (i *Ipam) FetchGwbyIP(ip net.IP) net.IP {
+func (i *Ipam) FetchGwbyIP(ctx context.Context, ip net.IP) net.IP {
 	ipPools := v1alpha1.IPPoolList{}
-	if err := i.k8sClient.List(context.Background(), &ipPools); err != nil {
+	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
 		return nil
 	}
