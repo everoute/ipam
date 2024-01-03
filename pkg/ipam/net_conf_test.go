@@ -580,7 +580,7 @@ var _ = Describe("net_conf_complete", func() {
 					Expect(c.Complete(ctx, k8sClient, ns)).Should(Succeed())
 					Expect(c.Type).Should(Equal(v1alpha1.AllocateTypeStatefulSet))
 					Expect(c.Pool).Should(Equal("pool1"))
-					Expect(c.IP).Should(Equal("10.10.65.1"))
+					Expect(c.IP).Should(BeElementOf("10.10.65.1", "10.10.65.2", "10.10.65.3", "10.10.65.4"))
 					Expect(c.Owner).Should(Equal(ns + "/" + stsName))
 				})
 			})
@@ -608,7 +608,7 @@ var _ = Describe("net_conf_complete", func() {
 					Expect(c.Complete(ctx, k8sClient, ns)).Should(Succeed())
 					Expect(c.Type).Should(Equal(v1alpha1.AllocateTypeStatefulSet))
 					Expect(c.Pool).Should(Equal("pool1"))
-					Expect(c.IP).Should(Equal("10.10.65.2"))
+					Expect(c.IP).Should(BeElementOf("10.10.65.2", "10.10.65.4"))
 					Expect(c.Owner).Should(Equal(ns + "/" + stsName))
 				})
 			})
@@ -699,11 +699,12 @@ func TestValid(t *testing.T) {
 		{
 			name: "valid with ip",
 			c: NetConf{
-				Type:       v1alpha1.AllocateTypePod,
-				K8sPodName: "pod",
-				K8sPodNs:   "ns",
-				Pool:       "pool",
-				IP:         "10.10.2.3",
+				Type:             v1alpha1.AllocateTypePod,
+				K8sPodName:       "pod",
+				K8sPodNs:         "ns",
+				Pool:             "pool",
+				IP:               "10.10.2.3",
+				AllocateIdentify: "cid",
 			},
 			isValid: true,
 		},
@@ -719,8 +720,18 @@ func TestValid(t *testing.T) {
 		{
 			name: "no k8sPodNs for type pod",
 			c: NetConf{
+				Type:             v1alpha1.AllocateTypePod,
+				K8sPodName:       "pod",
+				AllocateIdentify: "cid",
+			},
+			isValid: false,
+		},
+		{
+			name: "no AllocateIdentify for type pod",
+			c: NetConf{
 				Type:       v1alpha1.AllocateTypePod,
 				K8sPodName: "pod",
+				K8sPodNs:   "ns",
 			},
 			isValid: false,
 		},
@@ -746,35 +757,38 @@ func TestValid(t *testing.T) {
 			isValid: true,
 		},
 		{
-			name: "no owner for type owner",
+			name: "no owner for type statefulset",
 			c: NetConf{
-				Type:       v1alpha1.AllocateTypeStatefulSet,
-				K8sPodName: "pod",
-				K8sPodNs:   "ns",
-				Pool:       "pool1",
-				IP:         "10.10.1.1",
+				Type:             v1alpha1.AllocateTypeStatefulSet,
+				K8sPodName:       "pod",
+				K8sPodNs:         "ns",
+				Pool:             "pool1",
+				IP:               "10.10.1.1",
+				AllocateIdentify: "cid",
 			},
 			isValid: false,
 		},
 		{
 			name: "no ippool for type statefulset",
 			c: NetConf{
-				Type:       v1alpha1.AllocateTypeStatefulSet,
-				K8sPodName: "pod",
-				K8sPodNs:   "ns",
-				Owner:      "ns/ss",
-				IP:         "10.10.1.1",
+				Type:             v1alpha1.AllocateTypeStatefulSet,
+				K8sPodName:       "pod",
+				K8sPodNs:         "ns",
+				Owner:            "ns/ss",
+				IP:               "10.10.1.1",
+				AllocateIdentify: "cid",
 			},
 			isValid: false,
 		},
 		{
 			name: "no ip for type statefulset",
 			c: NetConf{
-				Type:       v1alpha1.AllocateTypeStatefulSet,
-				K8sPodName: "pod",
-				K8sPodNs:   "ns",
-				Owner:      "ns/ss",
-				Pool:       "pool1",
+				Type:             v1alpha1.AllocateTypeStatefulSet,
+				K8sPodName:       "pod",
+				K8sPodNs:         "ns",
+				Owner:            "ns/ss",
+				Pool:             "pool1",
+				AllocateIdentify: "cid",
 			},
 			isValid: false,
 		},

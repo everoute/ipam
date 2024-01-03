@@ -27,7 +27,7 @@ var (
 	ns        = "ipam"
 	ctx       = context.Background()
 	interval  = time.Second
-	timeout   = 2 * time.Minute
+	timeout   = time.Minute
 )
 
 var _ = BeforeSuite(func() {
@@ -79,12 +79,13 @@ func TestIPAM(t *testing.T) {
 func makeAllocateStatus(input ...string) map[string]v1alpha1.AllocateInfo {
 	res := make(map[string]v1alpha1.AllocateInfo)
 	i := 0
-	for i < len(input)-2 {
+	for i < len(input)-3 {
 		res[input[i]] = v1alpha1.AllocateInfo{
 			ID:   input[i+1],
 			Type: v1alpha1.AllocateType(input[i+2]),
+			CID:  input[i+3],
 		}
-		i += 3
+		i += 4
 	}
 	return res
 }

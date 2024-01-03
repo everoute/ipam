@@ -49,40 +49,14 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 		return nil, err
 	}
 
-	ipPool := &v1alpha1.IPPool{}
-
-	// get target ip pool
-	if conf.Pool == "" {
-		ipPools := v1alpha1.IPPoolList{}
-		if err := i.k8sClient.List(ctx, &ipPools); err != nil {
-			klog.Errorf("list ipPool error, err:%s", err)
-		}
-		for index, item := range ipPools.Items {
-			if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
-				return i.ParseResult(&ipPools.Items[index], ip), nil
-			}
-			// get the first no-full ip pool
-			if ipPool.Name == "" {
-				if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
-					ipPool = &ipPools.Items[index]
-				}
-			}
-		}
-		if ipPool.Name == "" {
-			return nil, fmt.Errorf("no IP address allocated in all pools")
-		}
-	} else {
-		// get user-specified ip pool
-		req := k8stypes.NamespacedName{
-			Name:      conf.Pool,
-			Namespace: i.namespace,
-		}
-		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
-			return nil, fmt.Errorf("get ip pool %s error, err: %s", req, err)
-		}
-		if ip := reallocateIP(conf, ipPool); ip != "" {
-			return i.ParseResult(ipPool, ip), nil
-		}
+	ipPool, reallocIP, err := i.getTargetIPPool(ctx, conf)
+	if err != nil {
+		klog.Errorf("Get target IPPool failed: %v", err)
+		return nil, err
+	}
+	if reallocIP != "" {
+		klog.Infof("Reallocate ip %s to the same request %v", reallocIP, *conf)
+		return i.ParseResult(ipPool, reallocIP), nil
 	}
 
 	conf.Pool = ipPool.Name
@@ -232,7 +206,10 @@ func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op O
 			if _, exist := pool.Status.UsedIps[conf.IP]; exist {
 				return fmt.Errorf("ip address exist")
 			}
-			if _, exist := pool.Status.AllocatedIPs[conf.IP]; exist {
+			if a, exist := pool.Status.AllocatedIPs[conf.IP]; exist {
+				if isSameAllocateInfo(a, conf) {
+					return nil
+				}
 				return fmt.Errorf("ip address exist")
 			}
 			if offset != constants.IPPoolOffsetFull {
@@ -258,7 +235,7 @@ func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op O
 				if v.Type == v1alpha1.AllocateTypeStatefulSet {
 					continue
 				}
-				if v.Type == conf.Type && v.ID == conf.getAllocateID() {
+				if isSameAllocateInfo(v, conf) {
 					delete(pool.Status.AllocatedIPs, k)
 					if pool.Status.Offset == constants.IPPoolOffsetFull {
 						pool.Status.Offset = offset
@@ -322,6 +299,67 @@ func (i *Ipam) GetNamespace() string {
 	return i.namespace
 }
 
+func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IPPool, string, error) {
+	ipPool := &v1alpha1.IPPool{}
+
+	if conf.Pool != "" {
+		// get user-specified ip pool
+		req := k8stypes.NamespacedName{
+			Name:      conf.Pool,
+			Namespace: i.namespace,
+		}
+		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
+			return nil, "", fmt.Errorf("get ip pool %s error, err: %s", req, err)
+		}
+		if ip := reallocateIP(conf, ipPool); ip != "" {
+			err := i.updateRelocateIPStatus(ctx, conf, ip, ipPool)
+			return ipPool, ip, err
+		}
+		return ipPool, "", nil
+	}
+
+	// get target ip pool
+	ipPools := v1alpha1.IPPoolList{}
+	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
+		klog.Errorf("list ipPool error, err:%s", err)
+		return nil, "", err
+	}
+	for index, item := range ipPools.Items {
+		if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
+			err := i.updateRelocateIPStatus(ctx, conf, ip, &ipPools.Items[index])
+			return &ipPools.Items[index], ip, err
+		}
+		// get the first no-full ip pool
+		if ipPool.Name == "" {
+			if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
+				ipPool = &ipPools.Items[index]
+			}
+		}
+	}
+	if ipPool.Name == "" {
+		return nil, "", fmt.Errorf("no IP address allocated in all pools")
+	}
+	return ipPool, "", nil
+}
+
+func (i *Ipam) updateRelocateIPStatus(ctx context.Context, conf *NetConf, ip string, ippool *v1alpha1.IPPool) error {
+	if conf.Type != v1alpha1.AllocateTypePod {
+		return nil
+	}
+	if conf.AllocateIdentify == ippool.Status.AllocatedIPs[ip].CID {
+		return nil
+	}
+	// update cid
+	newAllo := ippool.Status.AllocatedIPs[ip]
+	newAllo.CID = conf.AllocateIdentify
+	ippool.Status.AllocatedIPs[ip] = newAllo
+	if err := i.k8sClient.Status().Update(ctx, ippool); err != nil {
+		klog.Errorf("Failed to update ippool %s status for pod %v, err: %v", ippool.GetName(), *conf, err)
+		return err
+	}
+	return nil
+}
+
 func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
 	if conf.Pool != "" && conf.Pool != ipPool.Name {
 		return ""
@@ -330,21 +368,38 @@ func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
 		return ""
 	}
 
-	for ip := range ipPool.Status.AllocatedIPs {
-		if isSameAllocateInfo(ipPool.Status.AllocatedIPs[ip], conf) {
-			if conf.IP == "" || conf.IP == ip {
-				klog.Infof("Reallocate ip %s to the same request %v", ip, *conf)
-				return ip
-			}
-			klog.Errorf("Request ip %s is different from allocated ip %s for the same request %v", conf.IP, ip, *conf)
+	if conf.IP != "" {
+		a, exists := ipPool.Status.AllocatedIPs[conf.IP]
+		if !exists {
 			return ""
+		}
+		if isSameAllocateInfoForReallocate(a, conf) {
+			return conf.IP
+		}
+		klog.Errorf("Request ip %s is different from allocated ip %s for the same request %v", conf.IP, ip, *conf)
+		return ""
+	}
+
+	for ip := range ipPool.Status.AllocatedIPs {
+		if isSameAllocateInfoForReallocate(ipPool.Status.AllocatedIPs[ip], conf) {
+			return ip
 		}
 	}
 
 	return ""
 }
 
-func isSameAllocateInfo(allocateInfo v1alpha1.AllocateInfo, conf *NetConf) bool {
+func isSameAllocateInfoForReallocate(allocateInfo v1alpha1.AllocateInfo, conf *NetConf) bool {
 	allocateID := conf.getAllocateID()
 	return allocateInfo.Type == conf.Type && allocateInfo.ID == allocateID && allocateInfo.Owner == conf.Owner
+}
+
+func isSameAllocateInfo(allocateInfo v1alpha1.AllocateInfo, conf *NetConf) bool {
+	if !isSameAllocateInfoForReallocate(allocateInfo, conf) {
+		return false
+	}
+	if allocateInfo.Type == v1alpha1.AllocateTypePod {
+		return allocateInfo.CID == conf.AllocateIdentify
+	}
+	return true
 }
