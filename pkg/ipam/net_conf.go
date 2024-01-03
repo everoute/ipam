@@ -3,6 +3,7 @@ package ipam
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"strings"
 
@@ -84,9 +85,13 @@ func (c *NetConf) Complete(ctx context.Context, k8sClient client.Client, poolNs 
 }
 
 func (c *NetConf) Valid() error {
-	if c.Type == v1alpha1.AllocateTypeCNIUsed {
+	if c.Type == "" {
+		return fmt.Errorf("must set Type")
+	}
+
+	if c.Type == v1alpha1.AllocateTypeCNIUsed || c.Type == v1alpha1.AllocateTypePod {
 		if c.AllocateIdentify == "" {
-			return fmt.Errorf("type %s must set AllocatedIdentify", v1alpha1.AllocateTypeCNIUsed)
+			return fmt.Errorf("type %s must set AllocatedIdentify", c.Type)
 		}
 	}
 
@@ -117,11 +122,15 @@ func (c *NetConf) getAllocateID() string {
 }
 
 func (c *NetConf) genAllocateInfo() v1alpha1.AllocateInfo {
-	return v1alpha1.AllocateInfo{
+	a := v1alpha1.AllocateInfo{
 		Type:  c.Type,
 		ID:    c.getAllocateID(),
 		Owner: c.Owner,
 	}
+	if a.Type == v1alpha1.AllocateTypePod {
+		a.CID = c.AllocateIdentify
+	}
+	return a
 }
 
 func (c *NetConf) podStr() string {
@@ -188,15 +197,9 @@ func (c *NetConf) completeByStatefulSet(ctx context.Context, k8sClient client.Cl
 	}
 
 	if len(unUsedIPs) > 0 {
-		if pool.Status.AllocatedIPs == nil {
-			pool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-		}
-		pool.Status.AllocatedIPs[unUsedIPs[0]] = c.genAllocateInfo()
-		if err := k8sClient.Status().Update(ctx, &pool); err != nil {
-			klog.Errorf("Failed to update ippool %v status for allocate %s to pod %s, err: %v", poolNsName, unUsedIPs[0], c.podStr(), err)
-			return err
-		}
-		c.IP = unUsedIPs[0]
+		//nolint:gosec
+		index := rand.Intn(len(unUsedIPs))
+		c.IP = unUsedIPs[index]
 		return nil
 	}
 
