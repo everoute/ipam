@@ -51,8 +51,9 @@ type IPPoolStatus struct {
 
 type AllocateInfo struct {
 	// Type=pod, ID=podns/name
-	ID   string       `json:"id"`
-	Type AllocateType `json:"type,omitempty"`
+	ID    string       `json:"id"`
+	Extra string       `json:"extra,omiempty"`
+	Type  AllocateType `json:"type,omitempty"`
 	// Type=statefulset, owner=statefulsetns/name
 	Owner string `json:"owner,omitempty"`
 }

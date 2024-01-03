@@ -31,6 +31,7 @@ type NetConf struct {
 
 // Complete add ippool and static ip info to NetConf, param k8sClient must add corev1 scheme and appsv1 scheme
 func (c *NetConf) Complete(ctx context.Context, k8sClient client.Client, poolNs string) error {
+	return nil
 	// only complete netconf by k8s annotation
 	if c.Type != v1alpha1.AllocateTypePod {
 		return nil
@@ -117,11 +118,15 @@ func (c *NetConf) getAllocateID() string {
 }
 
 func (c *NetConf) genAllocateInfo() v1alpha1.AllocateInfo {
-	return v1alpha1.AllocateInfo{
+	a := v1alpha1.AllocateInfo{
 		Type:  c.Type,
 		ID:    c.getAllocateID(),
 		Owner: c.Owner,
 	}
+	if a.Type == v1alpha1.AllocateTypePod {
+		a.Extra = c.AllocateIdentify
+	}
+	return a
 }
 
 func (c *NetConf) podStr() string {

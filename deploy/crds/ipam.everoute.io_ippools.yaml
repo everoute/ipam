@@ -59,6 +59,8 @@ spec:
               allocatedips:
                 additionalProperties:
                   properties:
+                    extra:
+                      type: string
                     id:
                       description: Type=pod, ID=podns/name
                       type: string
@@ -68,6 +70,7 @@ spec:
                     type:
                       type: string
                   required:
+                  - extra
                   - id
                   type: object
                 description: AllocatedIPs is ip and allocated infos

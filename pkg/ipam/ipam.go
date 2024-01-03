@@ -6,6 +6,7 @@ import (
 	"net"
 
 	cniv1 "github.com/containernetworking/cni/pkg/types/100"
+	"k8s.io/apimachinery/pkg/types"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,6 +43,62 @@ func InitIpam(k8sClient client.Client, namespace string) *Ipam {
 	return ipam
 }
 
+func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IPPool, string, error) {
+	ipPool := &v1alpha1.IPPool{}
+
+	if conf.Pool != "" {
+		// get user-specified ip pool
+		req := k8stypes.NamespacedName{
+			Name:      conf.Pool,
+			Namespace: i.namespace,
+		}
+		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
+			return nil, "", fmt.Errorf("get ip pool %s error, err: %s", req, err)
+		}
+		if ip := reallocateIP(conf, ipPool); ip != "" {
+			err := i.updateRelocateIPStatus(ctx, conf, ip, ipPool)
+			return ipPool, ip, err
+		}
+		return ipPool, "", nil
+	}
+
+	// get target ip pool
+	ipPools := v1alpha1.IPPoolList{}
+	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
+		klog.Errorf("list ipPool error, err:%s", err)
+		return nil, "", err
+	}
+	for index, item := range ipPools.Items {
+		if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
+			err := i.updateRelocateIPStatus(ctx, conf, ip, &ipPools.Items[index])
+			return &ipPools.Items[index], ip, err
+		}
+		// get the first no-full ip pool
+		if ipPool.Name == "" {
+			if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
+				ipPool = &ipPools.Items[index]
+			}
+		}
+	}
+	if ipPool.Name == "" {
+		return nil, "", fmt.Errorf("no IP address allocated in all pools")
+	}
+	return ipPool, "", nil
+}
+
+func (i *Ipam) updateRelocateIPStatus(ctx context.Context, conf *NetConf, ip string, ippool *v1alpha1.IPPool) error {
+	if conf.Type != v1alpha1.AllocateTypePod {
+		return nil
+	}
+	a := ippool.Status.AllocatedIPs[ip]
+	a.Extra = conf.AllocateIdentify
+	if err := i.k8sClient.Status().Update(ctx, ippool); err != nil {
+		klog.Errorf("Failed to update ippool %s status for pod %v, err: %v", ippool.GetName(), *conf, err)
+		return err
+	}
+	return nil
+}
+
 //nolint:gocognit
 func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error) {
 	if err := conf.Valid(); err != nil {
@@ -49,40 +106,14 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 		return nil, err
 	}
 
-	ipPool := &v1alpha1.IPPool{}
-
-	// get target ip pool
-	if conf.Pool == "" {
-		ipPools := v1alpha1.IPPoolList{}
-		if err := i.k8sClient.List(ctx, &ipPools); err != nil {
-			klog.Errorf("list ipPool error, err:%s", err)
-		}
-		for index, item := range ipPools.Items {
-			if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
-				return i.ParseResult(&ipPools.Items[index], ip), nil
-			}
-			// get the first no-full ip pool
-			if ipPool.Name == "" {
-				if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
-					ipPool = &ipPools.Items[index]
-				}
-			}
-		}
-		if ipPool.Name == "" {
-			return nil, fmt.Errorf("no IP address allocated in all pools")
-		}
-	} else {
-		// get user-specified ip pool
-		req := k8stypes.NamespacedName{
-			Name:      conf.Pool,
-			Namespace: i.namespace,
-		}
-		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
-			return nil, fmt.Errorf("get ip pool %s error, err: %s", req, err)
-		}
-		if ip := reallocateIP(conf, ipPool); ip != "" {
-			return i.ParseResult(ipPool, ip), nil
-		}
+	ipPool, ip, err := i.getTargetIPPool(ctx, conf)
+	if err != nil {
+		klog.Errorf("Get target IPPool failed: %v", err)
+		return nil, err
+	}
+	if ip != "" {
+		klog.Infof("Reallocate ip %s to the same request %v", ip, *conf)
+		return i.ParseResult(ipPool, ip), nil
 	}
 
 	conf.Pool = ipPool.Name
@@ -121,6 +152,13 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 		conf.IP = newIP.String()
 		if err := i.UpdatePool(ctx, conf, newOffset, IPAdd); err != nil {
 			klog.Error(err)
+			req := types.NamespacedName{
+				Namespace: i.namespace,
+				Name:      ipPool.GetName(),
+			}
+			if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
+				klog.Errorf("Failed to get ippool %s, err: %v, continue", req, err)
+			}
 			continue
 		}
 		if newOffset == constants.IPPoolOffsetFull {
@@ -248,7 +286,7 @@ func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op O
 				if v.Type == v1alpha1.AllocateTypeStatefulSet {
 					continue
 				}
-				if v.Type == conf.Type && v.ID == conf.getAllocateID() {
+				if isSameAllocateInfoForDel(v, conf) {
 					delete(pool.Status.AllocatedIPs, k)
 					if pool.Status.Offset == constants.IPPoolOffsetFull {
 						pool.Status.Offset = offset
@@ -323,7 +361,6 @@ func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
 	for ip := range ipPool.Status.AllocatedIPs {
 		if isSameAllocateInfo(ipPool.Status.AllocatedIPs[ip], conf) {
 			if conf.IP == "" || conf.IP == ip {
-				klog.Infof("Reallocate ip %s to the same request %v", ip, *conf)
 				return ip
 			}
 			klog.Errorf("Request ip %s is different from allocated ip %s for the same request %v", conf.IP, ip, *conf)
@@ -337,4 +374,14 @@ func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
 func isSameAllocateInfo(allocateInfo v1alpha1.AllocateInfo, conf *NetConf) bool {
 	allocateID := conf.getAllocateID()
 	return allocateInfo.Type == conf.Type && allocateInfo.ID == allocateID && allocateInfo.Owner == conf.Owner
+}
+
+func isSameAllocateInfoForDel(allocateInfo v1alpha1.AllocateInfo, conf *NetConf) bool {
+	if !isSameAllocateInfo(allocateInfo, conf) {
+		return false
+	}
+	if allocateInfo.Type == v1alpha1.AllocateTypePod {
+		return allocateInfo.Extra == conf.AllocateIdentify
+	}
+	return true
 }
