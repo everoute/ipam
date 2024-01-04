@@ -116,6 +116,16 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 	}
 
 	for retry := 0; retry < FindRetryCount; retry++ {
+		if retry > 0 {
+			req := k8stypes.NamespacedName{
+				Namespace: i.namespace,
+				Name:      ipPool.GetName(),
+			}
+			if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
+				klog.Errorf("Failed to get ippool %s, err: %v, continue", req, err)
+				continue
+			}
+		}
 		newIP, newOffset := i.FindNext(ipPool)
 		klog.Info(newIP, newOffset)
 		conf.IP = newIP.String()
