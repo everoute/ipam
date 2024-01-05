@@ -16,7 +16,7 @@ import (
 
 var _ ProcessFun = cleanStaleIPForStatefulSet
 
-func cleanStaleIPForStatefulSet(ctx context.Context, k8sClient client.Client) {
+func cleanStaleIPForStatefulSet(ctx context.Context, k8sClient client.Client, k8sReader client.Reader) {
 	ippools := v1alpha1.IPPoolList{}
 	err := k8sClient.List(ctx, &ippools)
 	if err != nil {
@@ -43,7 +43,7 @@ func cleanStaleIPForStatefulSet(ctx context.Context, k8sClient client.Client) {
 				klog.Errorf("Can't get StatefulSet namespace and name for allocate info %v and ip %s in ippool %v", allo, ip, poolNsName)
 				continue
 			}
-			err := k8sClient.Get(ctx, stsNsName, &appsv1.StatefulSet{})
+			err := k8sReader.Get(ctx, stsNsName, &appsv1.StatefulSet{})
 			if err == nil {
 				continue
 			}

@@ -63,7 +63,7 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient.Create(ctx, &nsObj)).Should(Succeed())
 
 	By("init CleanStaleIP")
-	cleanStaleIP = NewCleanStaleIP(period, k8sClient)
+	cleanStaleIP = NewCleanStaleIP(period, k8sClient, k8sClient)
 
 	By("cleanStaleIP.Run")
 	cleanStaleIP.Run(ctrl.SetupSignalHandler())

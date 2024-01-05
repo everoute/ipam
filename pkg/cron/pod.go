@@ -16,7 +16,7 @@ import (
 
 var _ ProcessFun = cleanStaleIPForPod
 
-func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client) {
+func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client, k8sReader client.Reader) {
 	ippools := v1alpha1.IPPoolList{}
 	err := k8sClient.List(ctx, &ippools)
 	if err != nil {
@@ -43,16 +43,15 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client) {
 				klog.Errorf("Can't get pod namespace and name for allocate info %v and ip %s in ippool %v", allo, ip, poolNsName)
 				continue
 			}
-			err := k8sClient.Get(ctx, podNsName, &corev1.Pod{})
-			if err == nil {
-				continue
-			}
-			if !errors.IsNotFound(err) {
+			exists, err := isPodExist(ctx, podNsName, k8sClient, k8sReader)
+			if err != nil {
 				klog.Errorf("Failed to get pod %v for clean stale ip in ippool %v, err: %v", podNsName, poolNsName, err)
 				continue
 			}
-			klog.Infof("IP %s for pod %v is stale, will cleanup from ippool %v", ip, podNsName, poolNsName)
-			delIPs = append(delIPs, ip)
+			if !exists {
+				klog.Infof("IP %s for pod %v is stale, will cleanup from ippool %v", ip, podNsName, poolNsName)
+				delIPs = append(delIPs, ip)
+			}
 		}
 		if len(delIPs) == 0 {
 			continue
@@ -68,4 +67,25 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client) {
 			klog.Errorf("Failed to update ippool %v status, err: %v", ippool, err)
 		}
 	}
+}
+
+func isPodExist(ctx context.Context, podNsName types.NamespacedName, k8sClient client.Client, k8sReader client.Reader) (bool, error) {
+	err := k8sClient.Get(ctx, podNsName, &corev1.Pod{})
+	if err == nil {
+		return true, nil
+	}
+	if !errors.IsNotFound(err) {
+		klog.Errorf("Failed to get pod %v, err: %v", podNsName, err)
+		return true, err
+	}
+
+	err2 := k8sReader.Get(ctx, podNsName, &corev1.Pod{})
+	if err2 == nil {
+		return true, nil
+	}
+	if !errors.IsNotFound(err2) {
+		klog.Errorf("Failed to get pod %v, err: %v", podNsName, err)
+		return true, err
+	}
+	return false, nil
 }

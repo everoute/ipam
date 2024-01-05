@@ -8,17 +8,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ProcessFun func(context.Context, client.Client)
+type ProcessFun func(context.Context, client.Client, client.Reader)
 
 type CleanStaleIP struct {
 	period       time.Duration
+	k8sReader    client.Reader
 	k8sClient    client.Client
 	processFuncs []ProcessFun
 }
 
-func NewCleanStaleIP(period time.Duration, k8sClient client.Client) *CleanStaleIP {
+func NewCleanStaleIP(period time.Duration, k8sClient client.Client, k8sReader client.Reader) *CleanStaleIP {
 	c := CleanStaleIP{
 		period:       period,
+		k8sReader:    k8sReader,
 		k8sClient:    k8sClient,
 		processFuncs: make([]ProcessFun, 0),
 	}
@@ -41,6 +43,6 @@ func (c *CleanStaleIP) RegistryCleanFunc(f ProcessFun) {
 
 func (c *CleanStaleIP) process(ctx context.Context) {
 	for i := range c.processFuncs {
-		c.processFuncs[i](ctx, c.k8sClient)
+		c.processFuncs[i](ctx, c.k8sClient, c.k8sReader)
 	}
 }
