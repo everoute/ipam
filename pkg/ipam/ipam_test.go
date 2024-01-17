@@ -341,7 +341,7 @@ var _ = Describe("ipam", func() {
 					}
 					res, err := ipam.ExecAdd(ctx, &c)
 					Expect(res).Should(BeNil())
-					Expect(err).Should(MatchError("no IP address allocated in all pools"))
+					Expect(err).Should(MatchError("no IP address allocated in all public pools"))
 				})
 			})
 
@@ -864,6 +864,51 @@ var _ = Describe("ipam", func() {
 						Expect(res).Should(BeNil())
 						Expect(err).ShouldNot(BeNil())
 					})
+				})
+			})
+		})
+		When("private pool", func() {
+			BeforeEach(func() {
+				// create private pool
+				pool1Copy := pool1.DeepCopy()
+				pool1Copy.Spec.Private = true
+				Expect(k8sClient.Create(ctx, pool1Copy)).Should(Succeed())
+			})
+			When("specify pool", func() {
+				It("allocate ip", func() {
+					c := NetConf{
+						Pool:             "pool1",
+						Type:             v1alpha1.AllocateTypePod,
+						K8sPodName:       "pod1",
+						K8sPodNs:         "ns1",
+						AllocateIdentify: "cid",
+					}
+					res, err := ipam.ExecAdd(ctx, &c)
+					Expect(err).ToNot(HaveOccurred())
+					exp := makeCNIIPconfig("10.10.65.0", pool1mask, pool1GW)
+					Expect(*res.IPs[0]).To(Equal(*exp))
+					Eventually(func(g Gomega) {
+						ippool := v1alpha1.IPPool{}
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+						g.Expect(ippool.Status).ShouldNot(BeNil())
+						g.Expect(ippool.Status.Offset).Should(Equal(int64(1)))
+						g.Expect(ippool.Status.UsedIps).Should(BeNil())
+						g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(1))
+						g.Expect(ippool.Status.AllocatedIPs).Should(HaveKeyWithValue("10.10.65.0", v1alpha1.AllocateInfo{ID: "ns1/pod1", Type: v1alpha1.AllocateTypePod, CID: "cid"}))
+					}, timeout, interval).Should(Succeed())
+				})
+			})
+			When("doesn't specify pool", func() {
+				It("can't allocate ip", func() {
+					c := NetConf{
+						Type:             v1alpha1.AllocateTypePod,
+						K8sPodName:       "pod1",
+						K8sPodNs:         "ns1",
+						AllocateIdentify: "cid",
+					}
+					res, err := ipam.ExecAdd(ctx, &c)
+					Expect(res).Should(BeNil())
+					Expect(err).Should(MatchError("no IP address allocated in all public pools"))
 				})
 			})
 		})
