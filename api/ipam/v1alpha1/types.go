@@ -36,6 +36,7 @@ type IPPoolSpec struct {
 	//nolint: lll
 	// +kubebuilder:validation:Pattern="^(((([1]?\\d)?\\d|2[0-4]\\d|25[0-5])\\.){3}(([1]?\\d)?\\d|2[0-4]\\d|25[0-5]))|([\\da-fA-F]{1,4}(\\:[\\da-fA-F]{1,4}){7})|(([\\da-fA-F]{1,4}:){0,5}::([\\da-fA-F]{1,4}:){0,5}[\\da-fA-F]{1,4})$"
 	Gateway string `json:"gateway"`
+	Private bool   `json:"private,omitempty"`
 }
 
 // IPPoolStatus describe the current state of the IPPool

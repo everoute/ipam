@@ -325,6 +325,9 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 		return nil, "", err
 	}
 	for index, item := range ipPools.Items {
+		if ipPools.Items[index].Spec.Private {
+			continue
+		}
 		if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
 			err := i.updateRelocateIPStatus(ctx, conf, ip, &ipPools.Items[index])
 			return &ipPools.Items[index], ip, err
@@ -337,7 +340,7 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 		}
 	}
 	if ipPool.Name == "" {
-		return nil, "", fmt.Errorf("no IP address allocated in all pools")
+		return nil, "", fmt.Errorf("no IP address allocated in all public pools")
 	}
 	return ipPool, "", nil
 }
