@@ -131,8 +131,13 @@ func (i *Ipam) ExecDel(ctx context.Context, conf *NetConf) error {
 		return nil
 	}
 
+	if conf.Pool != "" {
+		_ = i.UpdatePool(ctx, conf, constants.IPPoolOffsetReset, IPDel)
+		return nil
+	}
+
 	ipPools := v1alpha1.IPPoolList{}
-	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
+	if err := i.k8sClient.List(ctx, &ipPools, client.InNamespace(i.namespace)); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
 	}
 	for _, item := range ipPools.Items {
@@ -282,7 +287,7 @@ func (i *Ipam) ParseResult(ipPool *v1alpha1.IPPool, ip string) *cniv1.Result {
 
 func (i *Ipam) FetchGwbyIP(ctx context.Context, ip net.IP) net.IP {
 	ipPools := v1alpha1.IPPoolList{}
-	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
+	if err := i.k8sClient.List(ctx, &ipPools, client.InNamespace(i.namespace)); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
 		return nil
 	}
@@ -320,7 +325,7 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 
 	// get target ip pool
 	ipPools := v1alpha1.IPPoolList{}
-	if err := i.k8sClient.List(ctx, &ipPools); err != nil {
+	if err := i.k8sClient.List(ctx, &ipPools, client.InNamespace(i.namespace)); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
 		return nil, "", err
 	}
