@@ -1047,6 +1047,16 @@ var _ = Describe("ipam", func() {
 				g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
 			})
 		})
+		It("release from unexist ippool", func() {
+			c := NetConf{
+				Pool:             "pool-unexist",
+				Type:             v1alpha1.AllocateTypePod,
+				K8sPodName:       "pod1",
+				K8sPodNs:         "ns1",
+				AllocateIdentify: "cid",
+			}
+			Expect(ipam.ExecDel(ctx, &c)).ToNot(HaveOccurred())
+		})
 		When("multi pool", func() {
 			BeforeEach(func() {
 				pool2Copy := pool2.DeepCopy()

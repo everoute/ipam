@@ -6,7 +6,9 @@ import (
 	"net"
 
 	cniv1 "github.com/containernetworking/cni/pkg/types/100"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -132,17 +134,36 @@ func (i *Ipam) ExecDel(ctx context.Context, conf *NetConf) error {
 	}
 
 	if conf.Pool != "" {
-		_ = i.UpdatePool(ctx, conf, constants.IPPoolOffsetReset, IPDel)
-		return nil
+		req := k8stypes.NamespacedName{
+			Name:      conf.Pool,
+			Namespace: i.namespace,
+		}
+		if err := i.k8sClient.Get(ctx, req, &v1alpha1.IPPool{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				klog.Warningf("Can't release ip to ippool %v for the ippool doesn't exists, param: %v", req, *conf)
+				return nil
+			}
+		}
+		return i.UpdatePool(ctx, conf, constants.IPPoolOffsetReset, IPDel)
 	}
 
 	ipPools := v1alpha1.IPPoolList{}
 	if err := i.k8sClient.List(ctx, &ipPools, client.InNamespace(i.namespace)); err != nil {
 		klog.Errorf("list ipPool error, err:%s", err)
+		return err
 	}
+
+	var errs []error
 	for _, item := range ipPools.Items {
 		conf.Pool = item.Name
-		_ = i.UpdatePool(ctx, conf, constants.IPPoolOffsetReset, IPDel)
+		err := i.UpdatePool(ctx, conf, constants.IPPoolOffsetReset, IPDel)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.NewAggregate(errs)
 	}
 
 	return nil
@@ -185,13 +206,13 @@ func (i *Ipam) FindNext(ipPool *v1alpha1.IPPool) (net.IP, int64) {
 
 //nolint:gocognit
 func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op OP) error {
+	req := k8stypes.NamespacedName{
+		Name:      conf.Pool,
+		Namespace: i.namespace,
+	}
 	for retry := 0; retry < UpdateRetryCount; retry++ {
 		// get up-to-date pool
 		pool := &v1alpha1.IPPool{}
-		req := k8stypes.NamespacedName{
-			Name:      conf.Pool,
-			Namespace: i.namespace,
-		}
 		if err := i.k8sClient.Get(ctx, req, pool); err != nil {
 			klog.Errorf("get ip pool error,err %s", err)
 			continue
@@ -259,10 +280,10 @@ func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op O
 		if err == nil {
 			return nil
 		}
-		klog.Errorf("update ipPool error: %v", err)
+		klog.Errorf("update ipPool %v error: %v", req, err)
 	}
 
-	return fmt.Errorf("update ipPool failed")
+	return fmt.Errorf("update ipPool %v failed", req)
 }
 
 func (i *Ipam) ParseResult(ipPool *v1alpha1.IPPool, ip string) *cniv1.Result {
