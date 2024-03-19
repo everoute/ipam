@@ -199,6 +199,11 @@ func TestValidateAllocateIPs(t *testing.T) {
 			exp:  fmt.Errorf("ippool must contain has been allocated ip %s", "10.10.1.193"),
 		},
 		{
+			name: "allocate ip not in cidr for changed net",
+			pool: newIPPoolWithStatus(newIPPool("10.10.1.0/24", "10.10.1.1", "", "", "10.10.1.0/25", "10.10.1.129/32", "10.10.1.192/30"), nil, []string{"10.10.1.193", "10.10.1.128"}),
+			exp: fmt.Errorf("ippool must contain has been allocated ip %s", "10.10.1.193"),
+		},
+		{
 			name: "allocate ip not in cidr for changed prefixlen",
 			pool: newIPPoolWithStatus(newIPPool("10.10.1.0/24", "10.10.1.1", "", "", "10.10.1.128/26"), nil, []string{"10.10.1.254", "10.10.1.133"}),
 			exp:  fmt.Errorf("ippool must contain has been allocated ip %s", "10.10.1.254"),
