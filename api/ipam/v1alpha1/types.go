@@ -1,7 +1,11 @@
 package v1alpha1
 
 import (
+	"net"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/everoute/ipam/pkg/utils"
 )
 
 // +genclient
@@ -27,7 +31,22 @@ type IPPoolSpec struct {
 	// IP will allocated from CIDR
 	//nolint: lll
 	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\/([1-9]|[1-2]\\d|3[0-2])$"
-	CIDR string `json:"cidr"`
+	// +optional
+	CIDR string `json:"cidr,omitempty"`
+	// Except is IP net string array, e.g. [192.168.1.0/24, 192.168.2.1/32], when allocate ip to Pod, ip in Except won't be allocated
+	// +optional
+	Except []string `json:"except,omitempty"`
+
+	// Start is the start ip of an ip range, required End
+	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+	// +optional
+	Start string `json:"start,omitempty"`
+
+	// End is the end ip of an ip range, required Start
+	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"
+	// +optional
+	End string `json:"end,omitempty"`
+
 	// Subnet is the total L2 network,
 	//nolint: lll
 	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\/([1-9]|[1-2]\\d|3[0-2])$"
@@ -75,4 +94,22 @@ type IPPoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []IPPool `json:"items"`
+}
+
+func (r *IPPool) StartIP() net.IP {
+	if r.Spec.Start != "" {
+		return net.ParseIP(r.Spec.Start)
+	}
+
+	_, ipNet, _ := net.ParseCIDR(r.Spec.CIDR)
+	return utils.FirstIP(ipNet)
+}
+
+func (r *IPPool) EndIP() net.IP {
+	if r.Spec.End != "" {
+		return net.ParseIP(r.Spec.End)
+	}
+
+	_, ipNet, _ := net.ParseCIDR(r.Spec.CIDR)
+	return utils.LastIP(ipNet)
 }
