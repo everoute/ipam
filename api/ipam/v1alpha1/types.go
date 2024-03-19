@@ -33,6 +33,7 @@ type IPPoolSpec struct {
 	// +kubebuilder:validation:Pattern="^(?:(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\/([1-9]|[1-2]\\d|3[0-2])$"
 	// +optional
 	CIDR string `json:"cidr,omitempty"`
+
 	// Except is IP net string array, e.g. [192.168.1.0/24, 192.168.2.1/32], when allocate ip to Pod, ip in Except won't be allocated
 	// +optional
 	Except []string `json:"except,omitempty"`
