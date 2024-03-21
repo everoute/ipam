@@ -42,6 +42,7 @@ var _ = Describe("net_conf_complete", func() {
 		},
 		Spec: v1alpha1.IPPoolSpec{
 			CIDR:    "10.10.65.0/29",
+			Except:  []string{"10.10.65.7/32"},
 			Subnet:  "10.10.64.0/20",
 			Gateway: "10.10.64.1",
 		},
@@ -492,6 +493,51 @@ var _ = Describe("net_conf_complete", func() {
 					err := c.Complete(ctx, k8sClient, ns)
 					stsNsName := types.NamespacedName{Namespace: ns, Name: stsName}
 					ipList := []string{"12.10.65.1"}
+					Expect(err).Should(MatchError(fmt.Sprintf("no valid or unallocate ip in statefulset %v ip list %v", stsNsName, ipList)))
+				})
+			})
+			When("ip-list is in ippool except", func() {
+				BeforeEach(func() {
+					sts := appsv1.StatefulSet{}
+					Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: stsName}, &sts)).Should(Succeed())
+					sts.Annotations[constants.IpamAnnotationIPList] = "12.10.65.7"
+					Expect(k8sClient.Update(ctx, &sts)).Should(Succeed())
+				})
+				It("netconf set ip failed", func() {
+					c := NetConf{
+						K8sPodName: podname,
+						K8sPodNs:   ns,
+						Type:       v1alpha1.AllocateTypePod,
+					}
+					err := c.Complete(ctx, k8sClient, ns)
+					stsNsName := types.NamespacedName{Namespace: ns, Name: stsName}
+					ipList := []string{"12.10.65.7"}
+					Expect(err).Should(MatchError(fmt.Sprintf("no valid or unallocate ip in statefulset %v ip list %v", stsNsName, ipList)))
+				})
+			})
+			When("ip-list is not in ippool start-end", func() {
+				BeforeEach(func() {
+					p := v1alpha1.IPPool{}
+					Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: pool1.Name}, &p)).Should(Succeed())
+					p.Spec.CIDR = ""
+					p.Spec.Except = nil
+					p.Spec.Start = "10.10.65.0"
+					p.Spec.End = "10.10.65.7"
+					Expect(k8sClient.Update(ctx, &p)).Should(Succeed())
+					sts := appsv1.StatefulSet{}
+					Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: stsName}, &sts)).Should(Succeed())
+					sts.Annotations[constants.IpamAnnotationIPList] = "10.10.65.9"
+					Expect(k8sClient.Update(ctx, &sts)).Should(Succeed())
+				})
+				It("netconf set ip failed", func() {
+					c := NetConf{
+						K8sPodName: podname,
+						K8sPodNs:   ns,
+						Type:       v1alpha1.AllocateTypePod,
+					}
+					err := c.Complete(ctx, k8sClient, ns)
+					stsNsName := types.NamespacedName{Namespace: ns, Name: stsName}
+					ipList := []string{"10.10.65.9"}
 					Expect(err).Should(MatchError(fmt.Sprintf("no valid or unallocate ip in statefulset %v ip list %v", stsNsName, ipList)))
 				})
 			})

@@ -169,7 +169,6 @@ func (c *NetConf) completeByStatefulSet(ctx context.Context, k8sClient client.Cl
 		klog.Errorf("Failed to get specified ippool %v by pod %s owner statefulset %v, err: %v", poolNsName, c.podStr(), stsNsName, err)
 		return err
 	}
-	_, ipNet, _ := net.ParseCIDR(pool.Spec.CIDR)
 	unUsedIPs := []string{}
 	for _, ipStr := range ipList {
 		ip := net.ParseIP(ipStr)
@@ -178,7 +177,7 @@ func (c *NetConf) completeByStatefulSet(ctx context.Context, k8sClient client.Cl
 			klog.Errorf("Invalid ip %s", ipStr)
 			continue
 		}
-		if !ipNet.Contains(ip) {
+		if !pool.Contains(ip) {
 			klog.Errorf("IP %s doesn't in specified pool %v", ipStr, pool)
 			continue
 		}
