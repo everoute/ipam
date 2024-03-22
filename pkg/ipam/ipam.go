@@ -62,7 +62,7 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 	}
 
 	conf.Pool = ipPool.Name
-	klog.Infof("use ippool %s\n", ipPool.Name)
+	klog.Infof("use ippool %s for request %v", ipPool.Name, *conf)
 
 	// handle static ip
 	if conf.IP != "" {
@@ -361,6 +361,13 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
 			return nil, "", fmt.Errorf("get ip pool %s error, err: %s", req, err)
 		}
+		if conf.IP == "" {
+			if ipPool.Status.Offset == constants.IPPoolOffsetFull {
+				return nil, "", fmt.Errorf("the specified ippool %s has no IP to allocate", req)
+			}
+			return ipPool, "", nil
+		}
+
 		if ip := reallocateIP(conf, ipPool); ip != "" {
 			err := i.updateRelocateIPStatus(ctx, conf, ip, ipPool)
 			return ipPool, ip, err
@@ -378,15 +385,9 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 		if ipPools.Items[index].Spec.Private {
 			continue
 		}
-		if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
-			err := i.updateRelocateIPStatus(ctx, conf, ip, &ipPools.Items[index])
-			return &ipPools.Items[index], ip, err
-		}
 		// get the first no-full ip pool
-		if ipPool.Name == "" {
-			if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
-				ipPool = &ipPools.Items[index]
-			}
+		if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
+			ipPool = &ipPools.Items[index]
 		}
 	}
 	if ipPool.Name == "" {
@@ -414,29 +415,19 @@ func (i *Ipam) updateRelocateIPStatus(ctx context.Context, conf *NetConf, ip str
 }
 
 func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
-	if conf.Pool != "" && conf.Pool != ipPool.Name {
-		return ""
-	}
 	if ipPool.Status.AllocatedIPs == nil {
 		return ""
 	}
-
-	if conf.IP != "" {
-		a, exists := ipPool.Status.AllocatedIPs[conf.IP]
-		if !exists {
-			return ""
-		}
-		if isSameAllocateInfoForReallocate(a, conf) {
-			return conf.IP
-		}
-		klog.Errorf("Request ip %s is different from allocated ip %s for the same request %v", conf.IP, ip, *conf)
+	if conf.IP == "" {
 		return ""
 	}
 
-	for ip := range ipPool.Status.AllocatedIPs {
-		if isSameAllocateInfoForReallocate(ipPool.Status.AllocatedIPs[ip], conf) {
-			return ip
-		}
+	a, exists := ipPool.Status.AllocatedIPs[conf.IP]
+	if !exists {
+		return ""
+	}
+	if isSameAllocateInfoForReallocate(a, conf) {
+		return conf.IP
 	}
 
 	return ""
