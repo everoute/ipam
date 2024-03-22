@@ -99,6 +99,8 @@ var _ = Describe("clean_stale_ip", func() {
 		By("setup resources")
 		pod1Copy := pod1.DeepCopy()
 		Expect(k8sClient.Create(ctx, pod1Copy)).Should(Succeed())
+		pod1Copy.Status.PodIP = "10.10.65.1"
+		Expect(k8sClient.Status().Update(ctx, pod1Copy)).Should(Succeed())
 		pod2Copy := pod2.DeepCopy()
 		Expect(k8sClient.Create(ctx, pod2Copy)).Should(Succeed())
 		pool1Copy := pool1.DeepCopy()
@@ -123,7 +125,7 @@ var _ = Describe("clean_stale_ip", func() {
 				ippool.Status.Offset = constants.IPPoolOffsetFull
 				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
 				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
-				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + pod1Name}
 				ippool.Status.AllocatedIPs["10.10.65.3"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/" + "pod-unexist"}
 				ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
 				Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
@@ -136,9 +138,9 @@ var _ = Describe("clean_stale_ip", func() {
 					By("should reset offset")
 					g.Expect(ippool.Status.Offset).Should(Equal(int64(constants.IPPoolOffsetReset)))
 					By("should cleanup stale IP for Pod")
-					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(3))
+					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(2))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.1"))
-					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.2"))
+					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.2"))
 					g.Expect(ippool.Status.AllocatedIPs).Should(HaveKey("10.10.65.4"))
 					g.Expect(ippool.Status.AllocatedIPs).ShouldNot(HaveKey("10.10.65.3"))
 					By("another pool doesn't change")
