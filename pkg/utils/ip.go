@@ -26,3 +26,7 @@ func LastIP(ipNet *net.IPNet) net.IP {
 	add := uint32(math.Pow(2, float64(bits-ones))) - 1
 	return Uint32ToIpv4(uintIP + add)
 }
+
+func IPBiggerThan(big net.IP, small net.IP) bool {
+	return Ipv4ToUint32(big) > Ipv4ToUint32(small)
+}

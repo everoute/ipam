@@ -65,7 +65,7 @@ func cleanStaleIPForStatefulSet(ctx context.Context, k8sClient client.Client, k8
 		}
 		err := k8sClient.Status().Update(ctx, &ippool)
 		if err != nil {
-			klog.Errorf("Failed to update ippool %v status, err: %v", ippool, err)
+			klog.Errorf("Failed to update ippool %s status, err: %s", poolNsName, err)
 		}
 	}
 }

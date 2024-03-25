@@ -16,7 +16,8 @@ func TestValidatePool(t *testing.T) {
 		},
 		{
 			Spec: IPPoolSpec{
-				CIDR: "10.30.0.0/16",
+				Start: "10.30.0.0",
+				End:   "10.30.255.255",
 			},
 		},
 		{
@@ -48,8 +49,7 @@ func TestValidatePool(t *testing.T) {
 			CIDR: "10.50.10.0/24",
 		},
 	}, "")
-	if err.Error() != "default/test2 (want add) conflict with default/test1 (exist). "+
-		"And(cidr) want is 10.50.10.0/24 exist is 10.50.0.0/16" {
+	if err.Error() != "default/test2 (want add) conflict with default/test1 (exist)" {
 		t.Fatal("big exist")
 	}
 
@@ -62,7 +62,21 @@ func TestValidatePool(t *testing.T) {
 			CIDR: "10.0.0.0/8",
 		},
 	}, "default/test1")
-	if err.Error() != "default/test1 (want add) conflict with / (exist). And(cidr) want is 10.0.0.0/8 exist is 10.20.0.0/16" {
+	if err.Error() != "default/test1 (want add) conflict with / (exist)" {
+		t.Fatal("small exist")
+	}
+
+	err = ValidatePool(poollist, IPPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test1",
+			Namespace: "default",
+		},
+		Spec: IPPoolSpec{
+			Start: "10.0.128.128",
+			End:   "10.20.0.128",
+		},
+	}, "default/test1")
+	if err.Error() != "default/test1 (want add) conflict with / (exist)" {
 		t.Fatal("small exist")
 	}
 
@@ -75,7 +89,7 @@ func TestValidatePool(t *testing.T) {
 			CIDR: "10.30.0.0/16",
 		},
 	}, "")
-	if err.Error() != "default/test3 (want add) conflict with / (exist). And(cidr) want is 10.30.0.0/16 exist is 10.30.0.0/16" {
+	if err.Error() != "default/test3 (want add) conflict with / (exist)" {
 		t.Fatal("same exist")
 	}
 
@@ -118,5 +132,11 @@ func TestValidatePool(t *testing.T) {
 
 	if len(mycache.newAddPools) != 2 {
 		t.Fatal("local cache only two")
+	}
+
+	// del ippool
+	_ = ValidatePool(poollist, IPPool{}, "default/test2")
+	if len(mycache.newAddPools) != 1 {
+		t.Fatal("should remove deleted ippool from cache")
 	}
 }

@@ -25,7 +25,7 @@ var (
 	ns          = "test-controller"
 	ctx, cancel = context.WithCancel(ctrl.SetupSignalHandler())
 	interval    = 1 * time.Second
-	timeout     = 1 * time.Minute
+	timeout     = 10 * time.Second
 )
 
 var _ = BeforeSuite(func() {
@@ -59,6 +59,9 @@ var _ = BeforeSuite(func() {
 	By("setup statefulset controller")
 	Expect((&STSReconciler{Client: mgr.GetClient()}).SetUpWithManager(mgr)).Should(Succeed())
 
+	By("setup ippool controller")
+	Expect((&PoolController{Client: mgr.GetClient()}).SetupWithManager(mgr)).Should(Succeed())
+
 	By("get k8sClient")
 	k8sClient = mgr.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
@@ -88,4 +91,42 @@ var _ = AfterSuite(func() {
 func TestController(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controller suit")
+}
+
+func newIPPool(subnet, gw, start, end, cidr string, excepts ...string) *v1alpha1.IPPool {
+	return &v1alpha1.IPPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pool",
+			Namespace: "ns",
+		},
+		Spec: v1alpha1.IPPoolSpec{
+			Subnet:  subnet,
+			Gateway: gw,
+			CIDR:    cidr,
+			Start:   start,
+			End:     end,
+			Except:  excepts,
+		},
+	}
+}
+
+func newIPPoolWithStatus(p *v1alpha1.IPPool, offset int64, usedIPs []string, allocateIPs []string) *v1alpha1.IPPool {
+	p.Status.Offset = offset
+	if len(usedIPs) > 0 {
+		p.Status.UsedIps = make(map[string]string)
+	}
+	if len(allocateIPs) > 0 {
+		p.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+	}
+	for _, ip := range usedIPs {
+		p.Status.UsedIps[ip] = "xxxx"
+	}
+	for _, ip := range allocateIPs {
+		p.Status.AllocatedIPs[ip] = v1alpha1.AllocateInfo{
+			ID:   "xxxx",
+			Type: v1alpha1.AllocateTypePod,
+		}
+	}
+
+	return p
 }

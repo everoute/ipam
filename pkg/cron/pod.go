@@ -43,12 +43,12 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client, k8sReader 
 				klog.Errorf("Can't get pod namespace and name for allocate info %v and ip %s in ippool %v", allo, ip, poolNsName)
 				continue
 			}
-			exists, err := isPodExist(ctx, podNsName, k8sClient, k8sReader)
+			used, err := isIPUsedByPod(ctx, ip, podNsName, k8sClient, k8sReader)
 			if err != nil {
 				klog.Errorf("Failed to get pod %v for clean stale ip in ippool %v, err: %v", podNsName, poolNsName, err)
 				continue
 			}
-			if !exists {
+			if !used {
 				klog.Infof("IP %s for pod %v is stale, will cleanup from ippool %v", ip, podNsName, poolNsName)
 				delIPs = append(delIPs, ip)
 			}
@@ -64,24 +64,35 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client, k8sReader 
 		}
 		err := k8sClient.Status().Update(ctx, &ippool)
 		if err != nil {
-			klog.Errorf("Failed to update ippool %v status, err: %v", ippool, err)
+			klog.Errorf("Failed to update ippool %s status, err: %s", poolNsName, err)
 		}
 	}
 }
 
-func isPodExist(ctx context.Context, podNsName types.NamespacedName, k8sClient client.Client, k8sReader client.Reader) (bool, error) {
-	err := k8sClient.Get(ctx, podNsName, &corev1.Pod{})
+func isIPUsedByPod(ctx context.Context, ip string, podNsName types.NamespacedName, k8sClient client.Client, k8sReader client.Reader) (bool, error) {
+	p := corev1.Pod{}
+	err := k8sClient.Get(ctx, podNsName, &p)
 	if err == nil {
-		return true, nil
-	}
-	if !errors.IsNotFound(err) {
-		klog.Errorf("Failed to get pod %v, err: %v", podNsName, err)
-		return true, err
+		if p.Status.PodIP == ip {
+			return true, nil
+		}
+	} else {
+		if !errors.IsNotFound(err) {
+			klog.Errorf("Failed to get pod %s, err: %s", podNsName, err)
+			return true, err
+		}
 	}
 
 	err2 := k8sReader.Get(ctx, podNsName, &corev1.Pod{})
 	if err2 == nil {
-		return true, nil
+		if p.Status.PodIP == ip {
+			return true, nil
+		}
+		if p.Status.PodIP == "" {
+			klog.Warningf("Can't get pod %s ip, keep ip %s allocate info in ippool", podNsName, ip)
+			return true, nil
+		}
+		return false, nil
 	}
 	if !errors.IsNotFound(err2) {
 		klog.Errorf("Failed to get pod %v, err: %v", podNsName, err)

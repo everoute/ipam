@@ -1,7 +1,8 @@
 package constants
 
 const (
-	IPPoolOffsetReset  = 0
-	IPPoolOffsetFull   = -1
-	IPPoolOffsetIgnore = -2
+	IPPoolOffsetReset  int64 = 0
+	IPPoolOffsetFull   int64 = -1
+	IPPoolOffsetIgnore int64 = -2
+	IPPoolOffsetErr    int64 = -3
 )

@@ -62,8 +62,7 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 	}
 
 	conf.Pool = ipPool.Name
-	klog.Infof("use ippool %s\n", ipPool.Name)
-	_, ipNet, _ := net.ParseCIDR(ipPool.Spec.CIDR)
+	klog.Infof("use ippool %s for request %v", ipPool.Name, *conf)
 
 	// handle static ip
 	if conf.IP != "" {
@@ -73,7 +72,7 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 		if ip == nil {
 			return nil, fmt.Errorf("invalid static ip %s", conf.IP)
 		}
-		if !ipNet.Contains(ip) {
+		if !ipPool.Contains(ip) {
 			return nil, fmt.Errorf("static ip %s is not in target pool", conf.IP)
 		}
 		if _, exist := ipPool.Status.UsedIps[conf.IP]; exist {
@@ -101,9 +100,16 @@ func (i *Ipam) ExecAdd(ctx context.Context, conf *NetConf) (*cniv1.Result, error
 				klog.Errorf("Failed to get ippool %s, err: %v, continue", req, err)
 				continue
 			}
+			if ipPool.Status.Offset == constants.IPPoolOffsetFull {
+				break
+			}
 		}
 		newIP, newOffset := i.FindNext(ipPool)
 		klog.Info(newIP, newOffset)
+		if newOffset == constants.IPPoolOffsetErr {
+			klog.Errorf("can't find next IP for offset err")
+			break
+		}
 		conf.IP = newIP.String()
 		if err := i.UpdatePool(ctx, conf, newOffset, IPAdd); err != nil {
 			klog.Error(err)
@@ -170,32 +176,55 @@ func (i *Ipam) ExecDel(ctx context.Context, conf *NetConf) error {
 }
 
 func (i *Ipam) FindNext(ipPool *v1alpha1.IPPool) (net.IP, int64) {
-	_, ipNet, _ := net.ParseCIDR(ipPool.Spec.CIDR)
 	_, subnet, _ := net.ParseCIDR(ipPool.Spec.Subnet)
 
-	start := utils.Ipv4ToUint32(ipNet.IP)
-	ones, bits := ipNet.Mask.Size()
-	hostBits := bits - ones
-	length := 1 << hostBits
+	start := utils.Ipv4ToUint32(ipPool.StartIP())
+	length := ipPool.Length()
 
 	oldOffset := ipPool.Status.Offset
+	if oldOffset >= length {
+		return nil, constants.IPPoolOffsetErr
+	}
 	offset := ipPool.Status.Offset
+
+	firstIP := utils.FirstIP(subnet)
+	lastIP := utils.LastIP(subnet)
+
+	exceptNets := make([]*net.IPNet, 0, len(ipPool.Spec.Except))
+	for i := range ipPool.Spec.Except {
+		_, ipNet, _ := net.ParseCIDR(ipPool.Spec.Except[i])
+		exceptNets = append(exceptNets, ipNet)
+	}
+
+	validIP := func(ip net.IP) bool {
+		if ip.Equal(firstIP) || ip.Equal(lastIP) {
+			return false
+		}
+		if ip.String() == ipPool.Spec.Gateway {
+			return false
+		}
+		_, usedIPExist := ipPool.Status.UsedIps[ip.String()]
+		_, allocateExist := ipPool.Status.AllocatedIPs[ip.String()]
+		if usedIPExist || allocateExist {
+			return false
+		}
+		for i := range exceptNets {
+			if exceptNets[i].Contains(ip) {
+				return false
+			}
+		}
+		return true
+	}
 
 	for {
 		ipNum := start + uint32(offset)
 		newIP := utils.Uint32ToIpv4(ipNum)
-		if !newIP.Equal(utils.FirstIP(subnet)) &&
-			!newIP.Equal(utils.LastIP(subnet)) &&
-			newIP.String() != ipPool.Spec.Gateway {
-			_, usedIPExist := ipPool.Status.UsedIps[newIP.String()]
-			_, allocateExist := ipPool.Status.AllocatedIPs[newIP.String()]
-			if !usedIPExist && !allocateExist {
-				// get valid IP and set offset to next pos
-				return newIP, (offset + 1) % int64(length)
-			}
+		if validIP(newIP) {
+			// get valid IP and set offset to next pos
+			return newIP, (offset + 1) % length
 		}
 
-		offset = (offset + 1) % int64(length)
+		offset = (offset + 1) % length
 		if offset == oldOffset {
 			break
 		}
@@ -288,11 +317,7 @@ func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op O
 
 func (i *Ipam) ParseResult(ipPool *v1alpha1.IPPool, ip string) *cniv1.Result {
 	var ipNet *net.IPNet
-	if ipPool.Spec.Subnet != "" {
-		_, ipNet, _ = net.ParseCIDR(ipPool.Spec.Subnet)
-	} else {
-		_, ipNet, _ = net.ParseCIDR(ipPool.Spec.CIDR)
-	}
+	_, ipNet, _ = net.ParseCIDR(ipPool.Spec.Subnet)
 	return &cniv1.Result{
 		IPs: []*cniv1.IPConfig{
 			{
@@ -313,8 +338,7 @@ func (i *Ipam) FetchGwbyIP(ctx context.Context, ip net.IP) net.IP {
 		return nil
 	}
 	for _, item := range ipPools.Items {
-		_, ipNet, _ := net.ParseCIDR(item.Spec.CIDR)
-		if ipNet.Contains(ip) {
+		if item.Contains(ip) {
 			return net.ParseIP(item.Spec.Gateway)
 		}
 	}
@@ -337,6 +361,13 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 		if err := i.k8sClient.Get(ctx, req, ipPool); err != nil {
 			return nil, "", fmt.Errorf("get ip pool %s error, err: %s", req, err)
 		}
+		if conf.IP == "" {
+			if ipPool.Status.Offset == constants.IPPoolOffsetFull {
+				return nil, "", fmt.Errorf("the specified ippool %s has no IP to allocate", req)
+			}
+			return ipPool, "", nil
+		}
+
 		if ip := reallocateIP(conf, ipPool); ip != "" {
 			err := i.updateRelocateIPStatus(ctx, conf, ip, ipPool)
 			return ipPool, ip, err
@@ -354,15 +385,9 @@ func (i *Ipam) getTargetIPPool(ctx context.Context, conf *NetConf) (*v1alpha1.IP
 		if ipPools.Items[index].Spec.Private {
 			continue
 		}
-		if ip := reallocateIP(conf, &ipPools.Items[index]); ip != "" {
-			err := i.updateRelocateIPStatus(ctx, conf, ip, &ipPools.Items[index])
-			return &ipPools.Items[index], ip, err
-		}
 		// get the first no-full ip pool
-		if ipPool.Name == "" {
-			if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
-				ipPool = &ipPools.Items[index]
-			}
+		if item.Status.Offset != constants.IPPoolOffsetFull && item.Name != "" {
+			ipPool = &ipPools.Items[index]
 		}
 	}
 	if ipPool.Name == "" {
@@ -390,29 +415,19 @@ func (i *Ipam) updateRelocateIPStatus(ctx context.Context, conf *NetConf, ip str
 }
 
 func reallocateIP(conf *NetConf, ipPool *v1alpha1.IPPool) (ip string) {
-	if conf.Pool != "" && conf.Pool != ipPool.Name {
-		return ""
-	}
 	if ipPool.Status.AllocatedIPs == nil {
 		return ""
 	}
-
-	if conf.IP != "" {
-		a, exists := ipPool.Status.AllocatedIPs[conf.IP]
-		if !exists {
-			return ""
-		}
-		if isSameAllocateInfoForReallocate(a, conf) {
-			return conf.IP
-		}
-		klog.Errorf("Request ip %s is different from allocated ip %s for the same request %v", conf.IP, ip, *conf)
+	if conf.IP == "" {
 		return ""
 	}
 
-	for ip := range ipPool.Status.AllocatedIPs {
-		if isSameAllocateInfoForReallocate(ipPool.Status.AllocatedIPs[ip], conf) {
-			return ip
-		}
+	a, exists := ipPool.Status.AllocatedIPs[conf.IP]
+	if !exists {
+		return ""
+	}
+	if isSameAllocateInfoForReallocate(a, conf) {
+		return conf.IP
 	}
 
 	return ""
