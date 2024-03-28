@@ -33,7 +33,6 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client, k8sReader 
 			Namespace: ippool.GetNamespace(),
 			Name:      ippool.GetName(),
 		}
-		delIPs := make([]string, 0)
 		for ip, allo := range ippool.Status.AllocatedIPs {
 			if allo.Type != v1alpha1.AllocateTypePod {
 				continue
@@ -48,23 +47,33 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client, k8sReader 
 				klog.Errorf("Failed to get pod %v for clean stale ip in ippool %v, err: %v", podNsName, poolNsName, err)
 				continue
 			}
-			if !used {
-				klog.Infof("IP %s for pod %v is stale, will cleanup from ippool %v", ip, podNsName, poolNsName)
-				delIPs = append(delIPs, ip)
+			if used {
+				continue
 			}
-		}
-		if len(delIPs) == 0 {
-			continue
-		}
-		for _, ip := range delIPs {
-			delete(ippool.Status.AllocatedIPs, ip)
-		}
-		if ippool.Status.Offset == constants.IPPoolOffsetFull {
-			ippool.Status.Offset = constants.IPPoolOffsetReset
-		}
-		err := k8sClient.Status().Update(ctx, &ippool)
-		if err != nil {
-			klog.Errorf("Failed to update ippool %s status, err: %s", poolNsName, err)
+			poolNow := v1alpha1.IPPool{}
+			if err := k8sClient.Get(ctx, poolNsName, &poolNow); err != nil {
+				klog.Errorf("Failed to get the latest ippool %s status, err: %s", poolNsName, err)
+				continue
+			}
+			alloNew, ok := poolNow.Status.AllocatedIPs[ip]
+			if !ok {
+				klog.Infof("Stale ip %s doesn't in latest ippool %s, skip update ippool status", ip, poolNsName)
+				continue
+			}
+			if alloNew != allo {
+				klog.Infof("Allocate info of stale ip %s in ippool %s has updated, old is %v, new is %v, skip update ippool status", ip, poolNsName, allo, alloNew)
+				continue
+			}
+			klog.Infof("IP %s for pod %s is stale, begin to cleanup from ippool %s", ip, podNsName, poolNsName)
+			delete(poolNow.Status.AllocatedIPs, ip)
+			if poolNow.Status.Offset == constants.IPPoolOffsetFull {
+				poolNow.Status.Offset = constants.IPPoolOffsetReset
+			}
+			err = k8sClient.Status().Update(ctx, &poolNow)
+			if err != nil {
+				klog.Errorf("Failed to cleanup ippool %s stale ip %s, update ippool status err: %s", poolNsName, ip, err)
+			}
+			klog.Infof("Success to cleanup ippool %s stale ip %s for pod %s", poolNsName, ip, podNsName)
 		}
 	}
 }
@@ -89,7 +98,7 @@ func isIPUsedByPod(ctx context.Context, ip string, podNsName types.NamespacedNam
 			return true, nil
 		}
 		if p.Status.PodIP == "" {
-			klog.Warningf("Can't get pod %s ip, keep ip %s allocate info in ippool", podNsName, ip)
+			klog.Infof("Can't get pod %s ip, keep ip %s allocate info in ippool", podNsName, ip)
 			return true, nil
 		}
 		return false, nil
