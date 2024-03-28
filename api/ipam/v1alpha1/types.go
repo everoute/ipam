@@ -113,3 +113,34 @@ func (r *IPPool) EndIP() net.IP {
 	_, ipNet, _ := net.ParseCIDR(r.Spec.CIDR)
 	return utils.LastIP(ipNet)
 }
+
+func (r *IPPool) Length() int64 {
+	if r.Spec.CIDR != "" {
+		_, ipNet, _ := net.ParseCIDR(r.Spec.CIDR)
+		ones, bits := ipNet.Mask.Size()
+		hostBits := bits - ones
+		return 1 << hostBits
+	}
+
+	return int64(utils.Ipv4ToUint32(net.ParseIP(r.Spec.End)) - utils.Ipv4ToUint32(net.ParseIP(r.Spec.Start)) + 1)
+}
+
+func (r *IPPool) Contains(ip net.IP) bool {
+	startIPN := utils.Ipv4ToUint32(r.StartIP())
+	endIPN := utils.Ipv4ToUint32(r.EndIP())
+	ipN := utils.Ipv4ToUint32(ip)
+	if ipN < startIPN {
+		return false
+	}
+	if ipN > endIPN {
+		return false
+	}
+
+	for i := range r.Spec.Except {
+		_, ipNet, _ := net.ParseCIDR(r.Spec.Except[i])
+		if ipNet.Contains(ip) {
+			return false
+		}
+	}
+	return true
+}
