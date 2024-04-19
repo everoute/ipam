@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/everoute/ipam/api/ipam/v1alpha1"
@@ -1333,6 +1334,72 @@ var _ = Describe("ipam", func() {
 					g.Expect(len(ippool.Status.AllocatedIPs)).Should(Equal(0))
 				}, timeout, interval).Should(Succeed())
 			})
+		})
+	})
+
+	Context("allocate the max num ip", func() {
+		BeforeEach(func() {
+			pool := &v1alpha1.IPPool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pool-max",
+					Namespace: ns,
+				},
+				Spec: v1alpha1.IPPoolSpec{
+					CIDR:    "10.0.0.0/8",
+					Subnet:  "10.0.0.0/8",
+					Gateway: "10.0.0.9",
+				},
+			}
+			Expect(k8sClient.Create(ctx, pool)).Should(Succeed())
+			pool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+			pool.Status.AllocatedIPs["10.0.0.4"] = v1alpha1.AllocateInfo{
+				ID: "testdel/testdel",
+				Type: v1alpha1.AllocateTypePod,
+				CID: "testdelcid",
+			}
+			for i := 0; i < 6700; i++ {
+				ip := getRandomIP()
+				if ip == "10.0.0.4" {
+					continue
+				}
+				pool.Status.AllocatedIPs[ip] = v1alpha1.AllocateInfo{
+					ID:   string(uuid.NewUUID()) + string(uuid.NewUUID()) + string(uuid.NewUUID()) + string(uuid.NewUUID()),
+					Type: v1alpha1.AllocateTypePod,
+					CID:  string(uuid.NewUUID()),
+				}
+			}
+			Expect(k8sClient.Status().Update(ctx, pool)).Should(Succeed())
+		})
+		It("test max", func() {
+			for i := 0; i < 1000; i++ {
+				c := NetConf{
+					Type:             v1alpha1.AllocateTypePod,
+					AllocateIdentify: string(uuid.NewUUID()),
+					K8sPodName:       string(uuid.NewUUID()) + string(uuid.NewUUID()) + string(uuid.NewUUID()) + string(uuid.NewUUID()),
+					K8sPodNs:         string(uuid.NewUUID()) + string(uuid.NewUUID()) + string(uuid.NewUUID()) + string(uuid.NewUUID()),
+				}
+				_, err := ipam.ExecAdd(ctx, &c)
+				if err != nil {
+					break
+				}
+			}
+			By("begin to release ip when can't allocate new ip from ippool")
+			err := ipam.ExecDel(ctx, &NetConf{
+				Type: v1alpha1.AllocateTypePod,
+				AllocateIdentify: "testdelcid",
+				K8sPodName: "testdel",
+				K8sPodNs: "testdel",
+			})
+			Expect(err).Should(BeNil())
+			k := types.NamespacedName{
+				Namespace: ns,
+				Name: "pool-max",
+			}
+			p := &v1alpha1.IPPool{}
+			err = k8sClient.Get(ctx, k, p)
+			Expect(err).Should(BeNil())
+			_, ok := p.Status.AllocatedIPs["10.0.0.4"]
+			Expect(ok).Should(BeFalse())
 		})
 	})
 })

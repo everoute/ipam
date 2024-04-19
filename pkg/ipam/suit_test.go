@@ -2,6 +2,8 @@ package ipam
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"net"
 	"path/filepath"
 	"testing"
@@ -109,4 +111,8 @@ func makeCNIIPconfig(ip, mask, gateway string) *cniv1.IPConfig {
 		},
 		Gateway: net.ParseIP(gateway),
 	}
+}
+
+func getRandomIP() string {
+	return fmt.Sprintf("%d.%d.%d.%d", rand.Int31n(254)+1, rand.Int31n(255), rand.Int31n(255), rand.Int31n(255))
 }
