@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/everoute/ipam/pkg/utils"
+	"k8s.io/klog"
 )
 
 type pool struct {
@@ -23,6 +24,7 @@ func ValidatePool(poolList IPPoolList, wantAdd IPPool, old string) error {
 	mycache.Lock()
 	defer mycache.Unlock()
 	wantName := wantAdd.GetNamespace() + `/` + wantAdd.GetName()
+	klog.Errorf("begin validate pool %s", wantName)
 	noOld := false
 	if old == "" {
 		noOld = true
@@ -51,7 +53,10 @@ func ValidatePool(poolList IPPoolList, wantAdd IPPool, old string) error {
 	thisEndIP := wantAdd.EndIP()
 	for i := 0; i < len(ippools); i++ {
 		curPoolName := ippools[i].Namespace + `/` + ippools[i].Name
+		klog.Errorf("want name %s, curPoolName %s, noOld: %v", wantName, curPoolName, noOld)
 		if noOld || curPoolName != old {
+			klog.Errorf("curPool is %v", ippools[i])
+			klog.Errorf("this sip is %v, endip is %v, start ip is %v, real sip is %v, endIP is %v", thisStartIP, thisEndIP, ippools[0].StartIP(), ippools[i].StartIP(), ippools[i].EndIP())
 			if utils.IPBiggerThan(thisStartIP, ippools[i].EndIP()) {
 				continue
 			}

@@ -34,11 +34,13 @@ func (r *IPPool) ValidateCreate() (admission.Warnings, error) {
 		return nil, err
 	}
 
+	klog.Errorf("test create ippool %s", pool)
 	poollist := IPPoolList{}
 	err := poolsReader.List(context.Background(), &poollist)
 	if err != nil {
 		return nil, fmt.Errorf("err in list ippools: %s", err.Error())
 	}
+	klog.Errorf("test validate ippool %s", pool)
 	return nil, ValidatePool(poollist, *r, "")
 }
 
