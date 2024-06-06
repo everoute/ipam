@@ -55,7 +55,7 @@ func ValidatePool(poolList IPPoolList, wantAdd IPPool, old string) error {
 			if utils.IPBiggerThan(thisStartIP, ippools[i].EndIP()) {
 				continue
 			}
-			if utils.IPBiggerThan(ippools[0].StartIP(), thisEndIP) {
+			if utils.IPBiggerThan(ippools[i].StartIP(), thisEndIP) {
 				continue
 			}
 			return fmt.Errorf("%s (want add) conflict with %s (exist)", wantName, curPoolName)

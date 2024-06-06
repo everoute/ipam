@@ -25,6 +25,11 @@ func TestValidatePool(t *testing.T) {
 				CIDR: "10.40.0.0/16",
 			},
 		},
+		{
+			Spec: IPPoolSpec{
+				CIDR: "10.10.0.0/24",
+			},
+		},
 	}}
 
 	err := ValidatePool(poollist, IPPool{
@@ -91,6 +96,19 @@ func TestValidatePool(t *testing.T) {
 	}, "")
 	if err.Error() != "default/test3 (want add) conflict with / (exist)" {
 		t.Fatal("same exist")
+	}
+
+	err = ValidatePool(poollist, IPPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test4",
+			Namespace: "test-ecp",
+		},
+		Spec: IPPoolSpec{
+			CIDR: "10.10.0.0/26",
+		},
+	}, "")
+	if err == nil || err.Error() != "test-ecp/test4 (want add) conflict with / (exist)" {
+		t.Fatal("add overlap ippool")
 	}
 
 	err = ValidatePool(poollist, IPPool{
