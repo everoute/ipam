@@ -1,5 +1,5 @@
 # Everoute IPAM
-[![codecov](https://codecov.io/gh/everoute/template-repo/branch/main/graph/badge.svg)](https://codecov.io/gh/everoute/ipam)
+[![codecov](https://codecov.io/github/qingwusunny/ipam/graph/badge.svg?token=03HMIMC6CG)](https://codecov.io/github/qingwusunny/ipam)
 [![release](https://github.com/everoute/template-repo/actions/workflows/release.yaml/badge.svg)](https://github.com/everoute/ipam/actions/workflows/release.yaml)
 
 # Overview
