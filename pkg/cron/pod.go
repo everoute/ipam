@@ -69,6 +69,7 @@ func cleanStaleIPForPod(ctx context.Context, k8sClient client.Client, k8sReader 
 			if poolNow.Status.Offset == constants.IPPoolOffsetFull {
 				poolNow.Status.Offset = constants.IPPoolOffsetReset
 			}
+			poolNow.UpdateIPUsageCounter()
 			err = k8sClient.Status().Update(ctx, &poolNow)
 			if err != nil {
 				klog.Errorf("Failed to cleanup ippool %s stale ip %s, update ippool status err: %s", poolNsName, ip, err)

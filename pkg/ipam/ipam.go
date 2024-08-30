@@ -304,6 +304,9 @@ func (i *Ipam) UpdatePool(ctx context.Context, conf *NetConf, offset int64, op O
 		if !statusUpdate {
 			return nil
 		}
+
+		pool.UpdateIPUsageCounter()
+
 		// update status
 		err := i.k8sClient.Status().Update(ctx, pool)
 		if err == nil {

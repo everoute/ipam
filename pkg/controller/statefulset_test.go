@@ -66,16 +66,18 @@ var _ = Describe("statefulset_controller", func() {
 	})
 	Context("ippool full", func() {
 		BeforeEach(func() {
-			ippool := v1alpha1.IPPool{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
-			ippool.Status.Offset = constants.IPPoolOffsetFull
-			ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-			ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/pod1"}
-			ippool.Status.AllocatedIPs["10.10.65.6"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
-			ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
-			ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
-			ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/stsname2"}
-			Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				ippool := v1alpha1.IPPool{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+				ippool.Status.Offset = constants.IPPoolOffsetFull
+				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/pod1"}
+				ippool.Status.AllocatedIPs["10.10.65.6"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+				ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+				ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/stsname2"}
+				g.Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 		})
 		When("delete statefulset", func() {
 			BeforeEach(func() {
@@ -104,16 +106,18 @@ var _ = Describe("statefulset_controller", func() {
 
 	Context("ippool doesn't full", func() {
 		BeforeEach(func() {
-			ippool := v1alpha1.IPPool{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
-			ippool.Status.Offset = 3
-			ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
-			ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/pod1"}
-			ippool.Status.AllocatedIPs["10.10.65.6"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
-			ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
-			ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
-			ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/stsname2"}
-			Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				ippool := v1alpha1.IPPool{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "pool1"}, &ippool)).Should(Succeed())
+				ippool.Status.Offset = 3
+				ippool.Status.AllocatedIPs = make(map[string]v1alpha1.AllocateInfo)
+				ippool.Status.AllocatedIPs["10.10.65.1"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypePod, ID: ns + "/pod1"}
+				ippool.Status.AllocatedIPs["10.10.65.6"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeCNIUsed, ID: "dfgggg"}
+				ippool.Status.AllocatedIPs["10.10.65.2"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+				ippool.Status.AllocatedIPs["10.10.65.4"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/" + sts1Name}
+				ippool.Status.AllocatedIPs["10.10.65.5"] = v1alpha1.AllocateInfo{Type: v1alpha1.AllocateTypeStatefulSet, ID: "ownerstsPod", Owner: ns + "/stsname2"}
+				g.Expect(k8sClient.Status().Update(ctx, &ippool)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 		})
 		When("delete statefulset", func() {
 			BeforeEach(func() {

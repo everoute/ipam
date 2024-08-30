@@ -3,10 +3,10 @@
 CONTROLLER_GEN=$(shell which controller-gen)
 
 image-generate:
-	docker build -f build/image/generate/Dockerfile -t localhost/generate ./build/image/generate/
+	docker buildx build -f build/image/generate/Dockerfile -t localhost/generate ./build/image/generate/ --load
 
 image-test:
-	docker build -f build/image/unit-test/Dockerfile -t localhost/unit-test ./build/image/unit-test/
+	docker buildx build -f build/image/unit-test/Dockerfile -t localhost/unit-test ./build/image/unit-test/ --load
 
 generate: manifests codegen prefix
 

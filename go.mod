@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/containernetworking/cni v1.0.0
+	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo v1.13.0
 	github.com/onsi/gomega v1.27.7
 	k8s.io/api v0.27.7
