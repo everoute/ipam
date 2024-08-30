@@ -3,7 +3,10 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 
+	"github.com/mikioh/ipaddr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
@@ -35,16 +38,18 @@ func (p *PoolController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	if pool.Status.Offset == constants.IPPoolOffsetReset {
-		return ctrl.Result{}, nil
-	}
-
 	pool.Status.Offset = constants.IPPoolOffsetReset
+
+	// re-calculate ip counters
+	pool.Status.TotalCount = p.calAvailableIPs(pool.Spec)
+	pool.UpdateIPUsageCounter()
 	if err := p.Status().Update(ctx, &pool); err != nil {
 		klog.Errorf("Failed to update ippool %s status, err: %s", req.NamespacedName, err)
 		return ctrl.Result{}, err
 	}
-	klog.Infof("Success update ippool %s offset to %d", req.NamespacedName, constants.IPPoolOffsetReset)
+	pool.Status.UsedIps = nil
+	pool.Status.AllocatedIPs = nil
+	klog.Infof("Success update ippool %s to %+v %+v", req.NamespacedName, pool.Spec, pool.Status)
 	return ctrl.Result{}, nil
 }
 
@@ -61,7 +66,7 @@ func (p *PoolController) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return c.Watch(source.Kind(mgr.GetCache(), &v1alpha1.IPPool{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		CreateFunc: func(event.CreateEvent) bool { return false },
+		CreateFunc: func(event.CreateEvent) bool { return true },
 		UpdateFunc: p.predicateUpdate,
 		DeleteFunc: func(event.DeleteEvent) bool { return false },
 	})
@@ -72,10 +77,6 @@ func (p *PoolController) predicateUpdate(e event.UpdateEvent) bool {
 	oldObj, oldOk := e.ObjectOld.(*v1alpha1.IPPool)
 	if !newOk || !oldOk {
 		klog.Errorf("Can't transform object to ippool")
-		return false
-	}
-
-	if newObj.Status.Offset == 0 {
 		return false
 	}
 
@@ -91,17 +92,69 @@ func (p *PoolController) predicateUpdate(e event.UpdateEvent) bool {
 		return true
 	}
 
-	if len(newObj.Spec.Except) != len(oldObj.Spec.Except) {
-		return true
-	}
-
-	if len(newObj.Spec.Except) == 0 {
-		return false
-	}
-
-	newExpect := sets.New[string]()
-	newExpect.Insert(newObj.Spec.Except...)
-	oldExpect := sets.New[string]()
-	oldExpect.Insert(oldObj.Spec.Except...)
+	newExpect := sets.New(newObj.Spec.Except...)
+	oldExpect := sets.New(oldObj.Spec.Except...)
 	return !newExpect.Equal(oldExpect)
+}
+
+func (p *PoolController) calAvailableIPs(spec v1alpha1.IPPoolSpec) int64 {
+	allPrefix := []ipaddr.Prefix{}
+	exceptPrefix := []ipaddr.Prefix{}
+	if spec.CIDR != "" {
+		allPrefix = append(allPrefix, ip2Prefix(spec.CIDR))
+	} else {
+		allPrefix = append(allPrefix,
+			ipaddr.Summarize(net.ParseIP(spec.Start), net.ParseIP(spec.End))...)
+	}
+
+	for _, item := range spec.Except {
+		exceptPrefix = append(exceptPrefix, ip2Prefix(item))
+	}
+	_, subnetCIDR, _ := net.ParseCIDR(spec.Subnet)
+	subnetPrefix := ipaddr.NewPrefix(subnetCIDR)
+	// except first ip of subnet
+	exceptPrefix = append(exceptPrefix, ip2Prefix(subnetCIDR.IP.String()))
+	// except last ip of subnet
+	exceptPrefix = append(exceptPrefix, ip2Prefix(subnetPrefix.Last().String()))
+	// except gateway ip
+	exceptPrefix = append(exceptPrefix, ip2Prefix(spec.Gateway))
+
+	validPrefix := ipListDifference(allPrefix, exceptPrefix)
+	var cnt int64
+	for _, item := range validPrefix {
+		cnt += item.NumNodes().Int64()
+	}
+	return cnt
+}
+
+func ip2Prefix(str string) ipaddr.Prefix {
+	if !strings.Contains(str, "/") {
+		str += "/32"
+	}
+	_, cidr, _ := net.ParseCIDR(str)
+	return *ipaddr.NewPrefix(cidr)
+}
+
+func ipListDifference(newIPs, oldIPs []ipaddr.Prefix) []ipaddr.Prefix {
+	var prefixTarget []ipaddr.Prefix
+	for _, newIP := range newIPs {
+		prefixCur := []ipaddr.Prefix{newIP}
+		prefixNext := []ipaddr.Prefix{}
+		for index := range oldIPs {
+			for _, tmp := range prefixCur {
+				if tmp.Equal(&oldIPs[index]) {
+					continue
+				}
+				if tmp.Contains(&oldIPs[index]) {
+					prefixNext = append(prefixNext, tmp.Exclude(&oldIPs[index])...)
+				} else {
+					prefixNext = append(prefixNext, tmp)
+				}
+			}
+			prefixCur = append([]ipaddr.Prefix{}, prefixNext...)
+			prefixNext = []ipaddr.Prefix{}
+		}
+		prefixTarget = append(prefixTarget, prefixCur...)
+	}
+	return ipaddr.Aggregate(prefixTarget)
 }

@@ -16,6 +16,8 @@ import (
 
 var _ = Describe("ippool controller test", func() {
 	name := "pool-offset"
+	name2 := "pool-2"
+	name3 := "pool-3"
 	pool := v1alpha1.IPPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -25,6 +27,32 @@ var _ = Describe("ippool controller test", func() {
 			CIDR:    "192.18.1.1/24",
 			Gateway: "192.18.1.1",
 			Subnet:  "192.18.0.0/23",
+		},
+	}
+	pool2 := v1alpha1.IPPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name2,
+			Namespace: ns,
+		},
+		Spec: v1alpha1.IPPoolSpec{
+			CIDR:    "192.168.0.0/24",
+			Gateway: "192.168.0.1",
+			Subnet:  "192.168.0.0/16",
+			Except:  []string{"192.168.0.0/28"},
+		},
+	}
+
+	pool3 := v1alpha1.IPPool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name3,
+			Namespace: ns,
+		},
+		Spec: v1alpha1.IPPoolSpec{
+			Start:   "192.168.0.0",
+			End:     "192.168.2.16",
+			Gateway: "192.168.0.1",
+			Subnet:  "192.168.0.0/16",
+			Except:  []string{"192.168.0.0/28"},
 		},
 	}
 	BeforeEach(func() {
@@ -42,9 +70,9 @@ var _ = Describe("ippool controller test", func() {
 				p := v1alpha1.IPPool{}
 				Eventually(func(g Gomega) {
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &p)).Should(Succeed())
+					p.Status.Offset = 10
+					g.Expect(k8sClient.Status().Update(ctx, &p)).Should(Succeed())
 				}, timeout, interval).Should(Succeed())
-				p.Status.Offset = 10
-				Expect(k8sClient.Status().Update(ctx, &p)).Should(Succeed())
 
 				By("update spec cidr")
 				p.Spec.CIDR = "192.18.2.1/24"
@@ -57,6 +85,14 @@ var _ = Describe("ippool controller test", func() {
 					g.Expect(p.Status.Offset).Should(Equal(constants.IPPoolOffsetReset))
 				}, timeout, interval).Should(Succeed())
 			})
+			It("should update counter", func() {
+				Eventually(func(g Gomega) {
+					p := v1alpha1.IPPool{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &p)).Should(Succeed())
+					g.Expect(p.Status.TotalCount).Should(Equal(int64(256)))
+					g.Expect(p.Status.AvailableCount).Should(Equal(int64(256)))
+				}, timeout, interval).Should(Succeed())
+			})
 		})
 
 		When("offset full", func() {
@@ -65,10 +101,9 @@ var _ = Describe("ippool controller test", func() {
 				p := v1alpha1.IPPool{}
 				Eventually(func(g Gomega) {
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &p)).Should(Succeed())
+					p.Status.Offset = constants.IPPoolOffsetFull
+					g.Expect(k8sClient.Status().Update(ctx, &p)).Should(Succeed())
 				}, timeout, interval).Should(Succeed())
-
-				p.Status.Offset = constants.IPPoolOffsetFull
-				Expect(k8sClient.Status().Update(ctx, &p)).Should(Succeed())
 
 				By("update spec except")
 				p.Spec.Except = append(p.Spec.Except, "192.18.1.17/32")
@@ -80,6 +115,80 @@ var _ = Describe("ippool controller test", func() {
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &p)).Should(Succeed())
 					g.Expect(p.Status.Offset).Should(Equal(constants.IPPoolOffsetReset))
 				}, timeout, interval).Should(Succeed())
+			})
+			It("should update counter", func() {
+				Eventually(func(g Gomega) {
+					p := v1alpha1.IPPool{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &p)).Should(Succeed())
+					g.Expect(p.Status.TotalCount).Should(Equal(int64(253)))
+					g.Expect(p.Status.AvailableCount).Should(Equal(int64(253)))
+				}, timeout, interval).Should(Succeed())
+			})
+		})
+	})
+	Context("ip counter", func() {
+		When("pool with cidr", func() {
+			var p *v1alpha1.IPPool
+			BeforeEach(func() {
+				p = pool2.DeepCopy()
+				Expect(k8sClient.Create(ctx, p)).Should(Succeed())
+			})
+			It("should set right counters", func() {
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name2, Namespace: ns}, p)).Should(Succeed())
+					g.Expect(p.Status.TotalCount).Should(Equal(int64(240)))
+					g.Expect(p.Status.AvailableCount).Should(Equal(int64(240)))
+				}, timeout, interval).Should(Succeed())
+			})
+
+			When("update pool", func() {
+				BeforeEach(func() {
+					By("update spec cidr")
+					Eventually(func(g Gomega) {
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name2, Namespace: ns}, p)).Should(Succeed())
+						p.Spec.Except = []string{"192.168.128.0/28"}
+						g.Expect(k8sClient.Update(ctx, p)).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
+				})
+				It("should update counters", func() {
+					Eventually(func(g Gomega) {
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name2, Namespace: ns}, p)).Should(Succeed())
+						g.Expect(p.Status.TotalCount).Should(Equal(int64(254)))
+						g.Expect(p.Status.AvailableCount).Should(Equal(int64(254)))
+					}, timeout, interval).Should(Succeed())
+				})
+			})
+		})
+		When("pool with start end", func() {
+			var p *v1alpha1.IPPool
+			BeforeEach(func() {
+				p = pool3.DeepCopy()
+				Expect(k8sClient.Create(ctx, p)).Should(Succeed())
+			})
+			It("should set right counters", func() {
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name3, Namespace: ns}, p)).Should(Succeed())
+					g.Expect(p.Status.TotalCount).Should(Equal(int64(513)))
+					g.Expect(p.Status.AvailableCount).Should(Equal(int64(513)))
+				}, timeout, interval).Should(Succeed())
+			})
+
+			When("update pool", func() {
+				BeforeEach(func() {
+					By("update spec cidr")
+					Eventually(func(g Gomega) {
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name3, Namespace: ns}, p)).Should(Succeed())
+						p.Spec.Except = []string{"192.168.128.0/28"}
+						g.Expect(k8sClient.Update(ctx, p)).Should(Succeed())
+					}, timeout, interval).Should(Succeed())
+				})
+				It("should update counters", func() {
+					Eventually(func(g Gomega) {
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name3, Namespace: ns}, p)).Should(Succeed())
+						g.Expect(p.Status.TotalCount).Should(Equal(int64(527)))
+						g.Expect(p.Status.AvailableCount).Should(Equal(int64(527)))
+					}, timeout, interval).Should(Succeed())
+				})
 			})
 		})
 	})
@@ -108,7 +217,7 @@ func TestPredicateUpdate(t *testing.T) {
 			name: "update start-end but offset is 0",
 			old:  newIPPool("10.10.1.1/23", "10.1.1.1", "10.10.1.34", "10.10.1.56", ""),
 			new:  newIPPool("10.10.1.1/23", "10.1.1.1", "10.10.1.35", "10.10.1.57", ""),
-			exp:  false,
+			exp:  true,
 		},
 		{
 			name: "update cidr",

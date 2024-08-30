@@ -16,7 +16,17 @@ spec:
     singular: ippool
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.allocated_count
+      name: Allocated IPs
+      type: integer
+    - jsonPath: .status.available_count
+      name: Available IPs
+      type: integer
+    - jsonPath: .status.total_count
+      name: Total IPs
+      type: integer
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         properties:
@@ -72,6 +82,9 @@ spec:
           status:
             description: Status is the current state of the IPPool
             properties:
+              allocated_count:
+                format: int64
+                type: integer
               allocatedips:
                 additionalProperties:
                   properties:
@@ -92,9 +105,15 @@ spec:
                   type: object
                 description: AllocatedIPs is ip and allocated infos
                 type: object
+              available_count:
+                format: int64
+                type: integer
               offset:
                 description: Offset stores the current read pointer -1 means this
                   pool is full
+                format: int64
+                type: integer
+              total_count:
                 format: int64
                 type: integer
               usedips:

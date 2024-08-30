@@ -13,6 +13,9 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Allocated IPs",type="integer",JSONPath=".status.allocated_count"
+// +kubebuilder:printcolumn:name="Available IPs",type="integer",JSONPath=".status.available_count"
+// +kubebuilder:printcolumn:name="Total IPs",type="integer",JSONPath=".status.total_count"
 
 type IPPool struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -66,7 +69,10 @@ type IPPoolStatus struct {
 	AllocatedIPs map[string]AllocateInfo `json:"allocatedips,omitempty"`
 	// Offset stores the current read pointer
 	// -1 means this pool is full
-	Offset int64 `json:"offset,omitempty"`
+	Offset         int64 `json:"offset,omitempty"`
+	AllocatedCount int64 `json:"allocated_count,omitempty"`
+	TotalCount     int64 `json:"total_count,omitempty"`
+	AvailableCount int64 `json:"available_count,omitempty"`
 }
 
 type AllocateInfo struct {
@@ -123,6 +129,13 @@ func (r *IPPool) Length() int64 {
 	}
 
 	return int64(utils.Ipv4ToUint32(net.ParseIP(r.Spec.End)) - utils.Ipv4ToUint32(net.ParseIP(r.Spec.Start)) + 1)
+}
+
+func (r *IPPool) UpdateIPUsageCounter() {
+	r.Status.AllocatedCount = int64(len(r.Status.AllocatedIPs) + len(r.Status.UsedIps))
+	if cnt := r.Status.TotalCount - r.Status.AllocatedCount; cnt >= 0 {
+		r.Status.AvailableCount = cnt
+	}
 }
 
 func (r *IPPool) Contains(ip net.IP) bool {
