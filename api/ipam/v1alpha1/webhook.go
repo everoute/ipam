@@ -15,7 +15,7 @@ import (
 	"github.com/everoute/ipam/pkg/utils"
 )
 
-var poolsReader client.Client
+var poolsReader client.Reader
 
 func (r *IPPool) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	poolsReader = mgr.GetClient()
@@ -24,13 +24,19 @@ func (r *IPPool) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
+// SetClient For code reference without starting webhookServer.
+func SetClient(reader client.Reader) {
+	poolsReader = reader
+}
+
 var _ admission.Validator = &IPPool{}
 
 func (r *IPPool) ValidateCreate() (admission.Warnings, error) {
-	pool := r.Namespace + "/" + r.Name
-	klog.Infof("validate create ippool name is %s", pool)
-	if err := r.validateSpec(); err != nil {
-		klog.Errorf("invalid ippool %s for create, err: %s", pool, err)
+	poolKeys := client.ObjectKeyFromObject(r).String()
+	klog.Infof("validate create ippool name is %s", poolKeys)
+	v := NewIPPoolValidator(r)
+	if err := v.ValidateSpec(nil); err != nil {
+		klog.Errorf("invalid ippool %s for create, err: %s", poolKeys, err)
 		return nil, err
 	}
 
@@ -43,27 +49,20 @@ func (r *IPPool) ValidateCreate() (admission.Warnings, error) {
 }
 
 func (r *IPPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	pool := r.Namespace + "/" + r.Name
-	klog.Infof("validate update ippool name is %s", pool)
-	if reflect.DeepEqual(r.Spec, old.(*IPPool).Spec) {
+	poolKeys := client.ObjectKeyFromObject(r).String()
+	klog.Infof("validate update ippool name is %s", poolKeys)
+	oldIPPool := old.(*IPPool)
+	if reflect.DeepEqual(r.Spec, oldIPPool.Spec) {
 		return nil, nil
 	}
-
-	if err := r.validateSpec(); err != nil {
-		klog.Errorf("Invalid ippool %s for update, err: %s", pool, err)
+	v := NewIPPoolValidator(r)
+	if err := v.ValidateSpec(oldIPPool); err != nil {
+		klog.Errorf("Invalid ippool %s for update, err: %s", poolKeys, err)
 		return nil, err
 	}
 
-	oldSpec := old.(*IPPool).Spec
-	if r.Spec.Gateway != oldSpec.Gateway {
-		return nil, fmt.Errorf("can't modify IPPool %s gateway, try to update gateway from %s to %s", pool, oldSpec.Gateway, r.Spec.Gateway)
-	}
-	if r.Spec.Subnet != oldSpec.Subnet {
-		return nil, fmt.Errorf("can't modify IPPool %s subnet, try to update subnet from %s to %s", pool, oldSpec.Subnet, r.Spec.Subnet)
-	}
-
-	if err := r.validateAllocateIPs(); err != nil {
-		klog.Errorf("IPPool %s must contains all allocate ip when update, err: %s", pool, err)
+	if err := v.ValidateAllocateIPs(); err != nil {
+		klog.Errorf("IPPool %s must contains all allocate ip when update, err: %s", poolKeys, err)
 		return nil, err
 	}
 
@@ -84,8 +83,18 @@ func (r *IPPool) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
+type IPPoolValidator struct {
+	*IPPool
+}
+
+func NewIPPoolValidator(ipPool *IPPool) *IPPoolValidator {
+	return &IPPoolValidator{
+		IPPool: ipPool,
+	}
+}
+
 //nolint:gocognit
-func (r *IPPool) validateSpec() error {
+func (r *IPPoolValidator) ValidateSpec(oldIPPool *IPPool) error {
 	_, subnet, err := net.ParseCIDR(r.Spec.Subnet)
 	if err != nil {
 		return fmt.Errorf("failed to parse subnet %s, err: %s", r.Spec.Subnet, err)
@@ -147,22 +156,29 @@ func (r *IPPool) validateSpec() error {
 		return fmt.Errorf("ippool's ip must all in subnet %s", r.Spec.Subnet)
 	}
 
+	if oldIPPool != nil {
+		poolKeys := client.ObjectKeyFromObject(r).String()
+		if r.Spec.Gateway != oldIPPool.Spec.Gateway {
+			return fmt.Errorf("can't modify IPPool %s gateway, try to update gateway from %s to %s", poolKeys, oldIPPool.Spec.Gateway, r.Spec.Gateway)
+		}
+		if r.Spec.Subnet != oldIPPool.Spec.Subnet {
+			return fmt.Errorf("can't modify IPPool %s subnet, try to update subnet from %s to %s", poolKeys, oldIPPool.Spec.Subnet, r.Spec.Subnet)
+		}
+	}
 	return nil
 }
 
-func (r *IPPool) validateAllocateIPs() error {
+func (r *IPPoolValidator) ValidateAllocateIPs() error {
 	if len(r.Status.AllocatedIPs) == 0 && len(r.Status.UsedIps) == 0 {
 		return nil
 	}
-
 	if err := r.validateAllocateIPsForIPBlock(); err != nil {
 		return err
 	}
-
 	return r.validateAllocateIPsForStartEnd()
 }
 
-func (r *IPPool) validateAllocateIPsForIPBlock() error {
+func (r *IPPoolValidator) validateAllocateIPsForIPBlock() error {
 	if r.Spec.CIDR == "" {
 		return nil
 	}
@@ -213,7 +229,7 @@ func (r *IPPool) validateAllocateIPsForIPBlock() error {
 }
 
 //nolint:gocognit
-func (r *IPPool) validateAllocateIPsForStartEnd() error {
+func (r *IPPoolValidator) validateAllocateIPsForStartEnd() error {
 	if r.Spec.Start == "" {
 		return nil
 	}

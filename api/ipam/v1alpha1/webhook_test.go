@@ -144,7 +144,7 @@ func TestValidSpec(t *testing.T) {
 	}
 
 	for i := range tests {
-		res := tests[i].pool.validateSpec()
+		res := NewIPPoolValidator(tests[i].pool).ValidateSpec(nil)
 		if res == nil && tests[i].exp == nil {
 			continue
 		}
@@ -245,7 +245,7 @@ func TestValidateAllocateIPs(t *testing.T) {
 		},
 	}
 	for i := range tests {
-		res := tests[i].pool.validateAllocateIPs()
+		res := NewIPPoolValidator(tests[i].pool).ValidateAllocateIPs()
 		if res == nil && tests[i].exp == nil {
 			continue
 		}
