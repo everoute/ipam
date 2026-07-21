@@ -14,8 +14,6 @@ import (
 	"github.com/everoute/ipam/pkg/utils"
 )
 
-var _ ProcessFun = cleanStaleIPForStatefulSet
-
 func cleanStaleIPForStatefulSet(ctx context.Context, k8sClient client.Client, k8sReader client.Reader) {
 	ippools := v1alpha1.IPPoolList{}
 	err := k8sClient.List(ctx, &ippools)

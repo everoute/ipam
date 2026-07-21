@@ -89,7 +89,9 @@ spec:
                 additionalProperties:
                   properties:
                     cid:
-                      description: Type=pod, CID=containerID
+                      description: Type=pod, CID=pod network/container instance ID.
+                        It is also used by ecp to derive vethBase when cleaning stale
+                        local links.
                       type: string
                     id:
                       description: Type=pod, ID=podns/name
