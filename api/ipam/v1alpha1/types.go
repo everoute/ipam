@@ -78,7 +78,8 @@ type IPPoolStatus struct {
 type AllocateInfo struct {
 	// Type=pod, ID=podns/name
 	ID string `json:"id"`
-	// Type=pod, CID=containerID
+	// Type=pod, CID=pod network/container instance ID.
+	// It is also used by ecp to derive vethBase when cleaning stale local links.
 	CID  string       `json:"cid,omitempty"`
 	Type AllocateType `json:"type"`
 	// Type=statefulset, owner=statefulsetns/name
