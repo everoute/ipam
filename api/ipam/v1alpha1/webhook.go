@@ -6,6 +6,7 @@ import (
 	"net"
 	"reflect"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,47 +16,58 @@ import (
 	"github.com/everoute/ipam/pkg/utils"
 )
 
-var poolsReader client.Reader
+type IPPoolWebhook struct {
+	poolsReader client.Reader
+}
 
-func (r *IPPool) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	poolsReader = mgr.GetClient()
+func (wh *IPPoolWebhook) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	wh.poolsReader = mgr.GetClient()
 	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+		For(&IPPool{}).
+		WithValidator(wh).
 		Complete()
 }
 
-// SetClient For code reference without starting webhookServer.
-func SetClient(reader client.Reader) {
-	poolsReader = reader
-}
+var _ admission.CustomValidator = &IPPoolWebhook{}
 
-var _ admission.Validator = &IPPool{}
+func (wh *IPPoolWebhook) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	ipPool, ok := obj.(*IPPool)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected an IPPool but got a %T", obj))
+	}
 
-func (r *IPPool) ValidateCreate() (admission.Warnings, error) {
-	poolKeys := client.ObjectKeyFromObject(r).String()
+	poolKeys := client.ObjectKeyFromObject(ipPool).String()
 	klog.Infof("validate create ippool name is %s", poolKeys)
-	v := NewIPPoolValidator(r)
+	v := NewIPPoolValidator(ipPool)
 	if err := v.ValidateSpec(nil); err != nil {
 		klog.Errorf("invalid ippool %s for create, err: %s", poolKeys, err)
 		return nil, err
 	}
 
 	poollist := IPPoolList{}
-	err := poolsReader.List(context.Background(), &poollist)
+	err := wh.poolsReader.List(context.Background(), &poollist)
 	if err != nil {
 		return nil, fmt.Errorf("err in list ippools: %s", err.Error())
 	}
-	return nil, ValidatePool(poollist, *r, "")
+	return nil, ValidatePool(poollist, *ipPool, "")
 }
 
-func (r *IPPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	poolKeys := client.ObjectKeyFromObject(r).String()
+func (wh *IPPoolWebhook) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	oldIPPool, ok := oldObj.(*IPPool) //nolint:forcetypeassert
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected an IPPool but got a %T", oldObj))
+	}
+	ipPool, ok := newObj.(*IPPool) //nolint:forcetypeassert
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected an IPPool but got a %T", newObj))
+	}
+
+	poolKeys := client.ObjectKeyFromObject(ipPool).String()
 	klog.Infof("validate update ippool name is %s", poolKeys)
-	oldIPPool := old.(*IPPool)
-	if reflect.DeepEqual(r.Spec, oldIPPool.Spec) {
+	if reflect.DeepEqual(ipPool.Spec, oldIPPool.Spec) {
 		return nil, nil
 	}
-	v := NewIPPoolValidator(r)
+	v := NewIPPoolValidator(ipPool)
 	if err := v.ValidateSpec(oldIPPool); err != nil {
 		klog.Errorf("Invalid ippool %s for update, err: %s", poolKeys, err)
 		return nil, err
@@ -67,19 +79,24 @@ func (r *IPPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 	}
 
 	poollist := IPPoolList{}
-	err := poolsReader.List(context.Background(), &poollist)
+	err := wh.poolsReader.List(context.Background(), &poollist)
 	if err != nil {
 		return nil, fmt.Errorf("err in list ippools: %s", err.Error())
 	}
-	return nil, ValidatePool(poollist, *r, r.Namespace+`/`+r.Name)
+	return nil, ValidatePool(poollist, *ipPool, ipPool.Namespace+`/`+ipPool.Name)
 }
 
-func (r *IPPool) ValidateDelete() (admission.Warnings, error) {
-	klog.Infoln("validate delete ippool name is ", r.Namespace+`/`+r.Name)
-	if len(r.Status.AllocatedIPs) != 0 || len(r.Status.UsedIps) != 0 {
+func (wh *IPPoolWebhook) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	ipPool, ok := obj.(*IPPool)
+	if !ok {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("expected an IPPool but got a %T", obj))
+	}
+
+	klog.Infoln("validate delete ippool name is ", ipPool.Namespace+`/`+ipPool.Name)
+	if len(ipPool.Status.AllocatedIPs) != 0 || len(ipPool.Status.UsedIps) != 0 {
 		return nil, fmt.Errorf("IPPool has allocated IP, can't delete")
 	}
-	_ = ValidatePool(IPPoolList{Items: []IPPool{}}, IPPool{}, r.Namespace+`/`+r.Name)
+	_ = ValidatePool(IPPoolList{Items: []IPPool{}}, IPPool{}, ipPool.Namespace+`/`+ipPool.Name)
 	return nil, nil
 }
 

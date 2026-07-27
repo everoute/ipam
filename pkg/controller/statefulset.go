@@ -20,17 +20,17 @@ import (
 	"github.com/everoute/ipam/pkg/utils"
 )
 
-var stsPredicate predicate.Predicate = predicate.Funcs{
-	CreateFunc: func(event.CreateEvent) bool {
+var stsPredicate predicate.TypedPredicate[*appsv1.StatefulSet] = predicate.TypedFuncs[*appsv1.StatefulSet]{
+	CreateFunc: func(event.TypedCreateEvent[*appsv1.StatefulSet]) bool {
 		return false
 	},
-	UpdateFunc: func(event.UpdateEvent) bool {
+	UpdateFunc: func(event.TypedUpdateEvent[*appsv1.StatefulSet]) bool {
 		return false
 	},
-	DeleteFunc: func(event.DeleteEvent) bool {
+	DeleteFunc: func(event.TypedDeleteEvent[*appsv1.StatefulSet]) bool {
 		return true
 	},
-	GenericFunc: func(event.GenericEvent) bool {
+	GenericFunc: func(event.TypedGenericEvent[*appsv1.StatefulSet]) bool {
 		return false
 	},
 }
@@ -51,7 +51,7 @@ func (s *STSReconciler) SetUpWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}), &handler.EnqueueRequestForObject{}, stsPredicate)
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}, &handler.TypedEnqueueRequestForObject[*appsv1.StatefulSet]{}, stsPredicate))
 	return err
 }
 

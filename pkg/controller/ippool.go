@@ -65,18 +65,18 @@ func (p *PoolController) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	return c.Watch(source.Kind(mgr.GetCache(), &v1alpha1.IPPool{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		CreateFunc: func(event.CreateEvent) bool { return true },
+	return c.Watch(source.Kind(mgr.GetCache(), &v1alpha1.IPPool{}, &handler.TypedEnqueueRequestForObject[*v1alpha1.IPPool]{}, predicate.TypedFuncs[*v1alpha1.IPPool]{
+		CreateFunc: func(event.TypedCreateEvent[*v1alpha1.IPPool]) bool { return true },
 		UpdateFunc: p.predicateUpdate,
-		DeleteFunc: func(event.DeleteEvent) bool { return false },
-	})
+		DeleteFunc: func(event.TypedDeleteEvent[*v1alpha1.IPPool]) bool { return false },
+	}))
 }
 
-func (p *PoolController) predicateUpdate(e event.UpdateEvent) bool {
-	newObj, newOk := e.ObjectNew.(*v1alpha1.IPPool)
-	oldObj, oldOk := e.ObjectOld.(*v1alpha1.IPPool)
-	if !newOk || !oldOk {
-		klog.Errorf("Can't transform object to ippool")
+func (p *PoolController) predicateUpdate(e event.TypedUpdateEvent[*v1alpha1.IPPool]) bool {
+	newObj := e.ObjectNew
+	oldObj := e.ObjectOld
+	if newObj == nil || oldObj == nil {
+		klog.Errorf("New or old object is nil, so skip predicateUpdate.")
 		return false
 	}
 

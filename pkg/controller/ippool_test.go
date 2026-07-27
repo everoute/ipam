@@ -271,7 +271,7 @@ func TestPredicateUpdate(t *testing.T) {
 
 	p := &PoolController{}
 	for i := range tests {
-		e := event.UpdateEvent{
+		e := event.TypedUpdateEvent[*v1alpha1.IPPool]{
 			ObjectNew: tests[i].new,
 			ObjectOld: tests[i].old,
 		}

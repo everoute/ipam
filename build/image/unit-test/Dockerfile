@@ -1,4 +1,4 @@
-FROM golang:1.20
+FROM golang:1.23
 
 ENV ETCD_RELEASE_URL=https://github.com/etcd-io/etcd/releases/download
 ENV ETCD_VERSION=v3.5.6
